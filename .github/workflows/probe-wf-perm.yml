@@ -1,0 +1,28 @@
+name: Probe Workflow Push Permission
+
+# 一次性探针：验证 GITHUB_TOKEN 能否推送「.github/workflows/ 下的文件」。
+# 结论出来后本文件会被删除。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Push a workflow-file change with GITHUB_TOKEN
+        run: |
+          git config user.name "probe"
+          git config user.email "probe@example.com"
+          git checkout -B probe-branch
+          mkdir -p .github/workflows
+          printf '# probe %s\n' "$(date -u +%s)" > .github/workflows/_probe.yaml
+          git add .github/workflows/_probe.yaml
+          git commit -m "probe: test whether GITHUB_TOKEN can modify workflow files"
+          echo "----- push begin -----"
+          git push -u origin probe-branch 2>&1
+          RC=$?
+          echo "----- push exit=$RC -----"
+          exit $RC
