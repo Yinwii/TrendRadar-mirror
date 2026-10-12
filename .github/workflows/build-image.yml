@@ -1,11 +1,12 @@
-# scheduler-unfreeze touch 2026-10-12
-name: Build Fork Images to GHCR
+name: Build Images to GHCR
 
-# 本 fork 专用的镜像构建流程
+# 本仓库专用的镜像构建流程（独立仓库，非 fork）
 # 与上游 .github/workflows/docker.yml 的区别：
-#   - 上游只在打 tag 时构建，且推送到 wantcat/*（上游 Docker Hub，fork 中无法使用）
-#   - 本流程在 push master 时即构建，推送到 ghcr.io/yinwii/*（本 fork 自己的命名空间）
-# 因此日常开发流程为：改代码 -> push master -> Actions 自动出镜像 -> VPS pull 更新
+#   - 上游只在打 tag 时构建，且推送到 wantcat/*（上游 Docker Hub，本仓库无法使用）
+#   - 本流程在 push master 时即构建，推送到 ghcr.io/yinwii/*
+# 因此日常流程为：改代码 -> push master -> Actions 自动出镜像 -> VPS pull 更新
+# 历史：2026-10-12 由 fork 仓库迁移为独立仓库 —— fork 的 Actions 调度器被
+# GitHub 冻结（run 恒 queued、push 不触发），迁移后 push 即构建恢复正常。
 
 on:
   push:
