@@ -1,0 +1,19 @@
+# ============================================================
+# 本地定制层（fork 专用）—— 由 Yinwii 维护，不属于上游仓库
+# ------------------------------------------------------------
+# 作用：把仓库源码中的 4 个定制文件以只读方式挂进 trendradar 容器。
+# 为什么：镜像里的 /app 代码是构建时的快照，容器一旦被
+#         `docker compose up -d` / `pull` 重建，此前用 docker cp
+#         塞进去的定制改动就会丢失。挂载后「单一真源 = 仓库源码」，
+#         重建/更新都不会丢，也不需要再跑 _patches/apply.sh。
+# 上游同步：sync-upstream.sh 更新的是同一份源码 → 挂载自动跟随。
+# 定制文件清单：notification/splitter.py（推送排版）、
+#   report/formatter.py、report/html.py、report/rss_html.py（报告页+favicon）
+# ============================================================
+services:
+  trendradar:
+    volumes:
+      - ../trendradar/notification/splitter.py:/app/trendradar/notification/splitter.py:ro
+      - ../trendradar/report/formatter.py:/app/trendradar/report/formatter.py:ro
+      - ../trendradar/report/html.py:/app/trendradar/report/html.py:ro
+      - ../trendradar/report/rss_html.py:/app/trendradar/report/rss_html.py:ro
