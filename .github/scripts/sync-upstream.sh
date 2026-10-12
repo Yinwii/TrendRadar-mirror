@@ -16,6 +16,14 @@
 #   用 GITHUB_TOKEN 推送的提交【不会】触发 push 类 workflow（GitHub 的硬性规定），
 #   所以合并成功后必须自己 gh workflow run，否则镜像永远不会重建。
 #
+# ■ 为什么上游的 .github/workflows/ 改动不采纳
+#   GITHUB_TOKEN 是 GitHub App 身份、没有 workflows 权限；只要 push 的 ref 最终差异
+#   里含 workflow 文件，服务端就会拒绝整个 push（实测报错：refusing to allow a
+#   GitHub App to create or update workflow ... without `workflows` permission）。
+#   合并后把该目录还原成「合并前版本」即可放行 —— 已用三次探针实测：哪怕中间提交
+#   改过 workflow 文件，只要最终 ref 差异里没有 workflow 改动，push 照样通过。
+#   这些上游 workflow 只服务上游自己的发布/试用流程，与本仓库部署无关。
+#
 # 环境变量：
 #   UPSTREAM_URL / UPSTREAM_BRANCH  上游地址与分支（默认 sansan0/TrendRadar master）
 #   BRANCH                          本仓库分支（默认 master）
@@ -41,20 +49,42 @@ log() { printf '[%s] %s\n' "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" "$*"; }
 
 # ------------------------------------------------------------------ issue 通知
 # 每个标签最多保持一个打开中的 issue，避免每天刷屏；同一问题只追加评论。
-open_issue_or_comment() { # $1=label  $2=color  $3=title  $4=body
+open_issue_or_comment() { # $1=label  $2=color  $3=title  $4=body -> 0=成功
   gh label create "$1" --repo "$REPO" --color "$2" \
      --description "上游同步需要人工处理" --force >/dev/null 2>&1 || true
   local n
   n="$(gh issue list --repo "$REPO" --state open --label "$1" --limit 1 \
         --json number --jq '.[0].number // empty' 2>/dev/null || true)"
   if [ -n "${n:-}" ]; then
-    gh issue comment "$n" --repo "$REPO" --body "$4" >/dev/null 2>&1 \
-      && log "已追加评论到 issue #$n" || log "⚠️ 写 issue 评论失败（不致命）"
+    gh issue comment "$n" --repo "$REPO" --body "$4" >/dev/null 2>&1 || return 1
+    log "已追加评论到 issue #$n"
   else
-    gh issue create --repo "$REPO" --title "$3" --label "$1" --body "$4" >/dev/null 2>&1 \
-      && log "已创建 issue：$3" || log "⚠️ 创建 issue 失败（不致命）"
+    gh issue create --repo "$REPO" --title "$3" --label "$1" --body "$4" >/dev/null 2>&1 || return 1
+    log "已创建 issue：$3"
   fi
+  return 0
 }
+
+# ------------------------------------------------------------------ 自检模式
+# 只演练两个「外部调用」是否可用（gh 派发构建 + gh 写 issue），
+# 不拉上游、不合并、不推送。仅在收到 workflow_dispatch 且 probe=true 时进入。
+if [ "${PROBE:-0}" = "1" ]; then
+  log "PROBE=1 自检模式：只演练外部调用，不拉上游、不合并、不推送"
+  ok=1
+  if gh workflow run "$TARGET_WORKFLOW" --repo "$REPO" --ref "$BRANCH" >/dev/null 2>&1; then
+    log "✅ 自检通过：gh workflow run（派发镜像构建）可用"
+  else
+    log "✗ 自检失败：gh workflow run 不可用"; ok=0
+  fi
+  if open_issue_or_comment "upstream-sync-selftest" "1d76db" \
+       "[自检] 上游同步外部调用自检" \
+       "这是 **自检** 用的 issue，用于验证 issue 写入通道可用，可随时关闭/删除。"; then
+    log "✅ 自检通过：gh issue 写入可用"
+  else
+    log "✗ 自检失败：gh issue 写入不可用"; ok=0
+  fi
+  [ "$ok" = 1 ] && { log "🎉 自检全部通过"; exit 0; } || { log "✗ 自检存在失败项"; exit 1; }
+fi
 
 # ------------------------------------------------------------------ 0. 准备
 git config user.name  "github-actions[bot]"
@@ -112,9 +142,26 @@ if [ "$DRY_RUN" = "1" ]; then
 fi
 
 # ------------------------------------------------------------------ 2. 合并（冲突即停）
+PRE_MERGE="$(git rev-parse HEAD)"
 log "执行 git merge upstream/$UPSTREAM_BRANCH（只合并，绝不覆盖）"
 if git merge --no-edit "upstream/$UPSTREAM_BRANCH" >/tmp/merge.out 2>&1; then
   log "✅ 合并成功：$(git log --oneline -1)"
+
+  # ---- 2b. 上游对 .github/workflows/ 的改动按设计【不采纳】 ----
+  # 原因：GITHUB_TOKEN 是 GitHub App 身份，没有 workflows 权限，只要 push 的
+  #       ref 最终差异里含 workflow 文件就会被服务端拒绝：
+  #         "refusing to allow a GitHub App to create or update workflow ..."
+  #       已实测：把该目录还原成合并前版本后即可放行（edgeever 同款做法）。
+  #       这些上游 workflow（docker.yml / crawler.yml 等）本来只服务上游自己的
+  #       发布与试用流程，与我们的部署无关。
+  if git diff --name-only "$PRE_MERGE" HEAD -- .github/workflows | grep -q .; then
+    log "上游本次改动了 .github/workflows/ —— 按设计不采纳，还原为合并前版本"
+    git diff --name-only "$PRE_MERGE" HEAD -- .github/workflows | sed 's/^/    /'
+    git rm -r -q --ignore-unmatch .github/workflows
+    git checkout "$PRE_MERGE" -- .github/workflows
+    git commit --amend --no-edit -q
+    log "已修正合并提交：.github/workflows/ 保持本仓库版本"
+  fi
 else
   log "✗ 合并冲突 —— 已中止，本地定制未被改动、未推送、未出新镜像"
   sed 's/^/    /' /tmp/merge.out
@@ -152,9 +199,18 @@ fi
 NEW_SHA="$(git rev-parse --short HEAD)"
 log "✅ 已推送 $NEW_SHA"
 
-log "派发构建 $TARGET_WORKFLOW（GITHUB_TOKEN 推送不触发 workflow，必须显式派发）"
+SHA_FULL="$(git rev-parse HEAD)"
+log "派发构建 $TARGET_WORKFLOW（GITHUB_TOKEN 推送不会触发 workflow，必须显式派发）"
 dispatched=0
+# 兜底判断：万一 push 真的触发了构建（例如改用部署密钥推送），就别重复派发
+sleep 10
+if gh run list --repo "$REPO" --workflow "$TARGET_WORKFLOW" --limit 10 \
+     --json headSha --jq '.[].headSha' 2>/dev/null | grep -qx "$SHA_FULL"; then
+  log "✅ 该提交已有构建运行，无需重复派发"
+  dispatched=1
+fi
 for i in 1 2 3; do
+  [ "$dispatched" -eq 1 ] && break
   if gh workflow run "$TARGET_WORKFLOW" --repo "$REPO" --ref "$BRANCH" >/dev/null 2>&1; then
     dispatched=1; log "✅ 已派发（第 $i 次尝试）"; break
   fi

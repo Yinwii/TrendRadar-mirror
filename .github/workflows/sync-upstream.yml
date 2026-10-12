@@ -6,6 +6,8 @@ name: Sync Upstream
 #   只 merge、不 reset/checkout 覆盖；冲突即中止；绝不静默替换本地定制。
 #     · 上游改动与本地定制零重叠 → 自动合并 + 推送 + 出镜像（零手动）
 #     · 有冲突 → 中止，线上保持上一个好版本，开 issue 告警等人工处理
+#   另外：上游对 .github/workflows/ 的改动按设计不采纳（GITHUB_TOKEN 无
+#   workflows 权限，ref 差异里含 workflow 文件会被服务端拒绝推送）。
 
 on:
   schedule:
@@ -14,6 +16,10 @@ on:
     inputs:
       dry_run:
         description: '只检查不合并（dry-run）'
+        type: boolean
+        default: false
+      probe:
+        description: '自检：只演练「派发构建 + 写 issue」两个外部调用（不拉上游不合并）'
         type: boolean
         default: false
 
@@ -39,6 +45,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+          PROBE: ${{ inputs.probe && '1' || '0' }}
         run: |
           chmod +x .github/scripts/sync-upstream.sh
           ./.github/scripts/sync-upstream.sh
