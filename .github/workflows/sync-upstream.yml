@@ -1,0 +1,44 @@
+name: Sync Upstream
+
+# 每日把上游 sansan0/TrendRadar 的新提交合并进来，并显式派发镜像构建。
+#
+# 安全设计（详见 .github/scripts/sync-upstream.sh 头部说明）：
+#   只 merge、不 reset/checkout 覆盖；冲突即中止；绝不静默替换本地定制。
+#     · 上游改动与本地定制零重叠 → 自动合并 + 推送 + 出镜像（零手动）
+#     · 有冲突 → 中止，线上保持上一个好版本，开 issue 告警等人工处理
+
+on:
+  schedule:
+    - cron: '23 4 * * *' # 每天 04:23 UTC（= 12:23 Asia/Shanghai）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只检查不合并（dry-run）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # push 合并提交
+  actions: write # 显式派发 build-image.yml
+  issues: write # 冲突/漂移时开 issue 告警
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 同步上游（合并 / 冲突即停 / 派发构建）
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          chmod +x .github/scripts/sync-upstream.sh
+          ./.github/scripts/sync-upstream.sh
