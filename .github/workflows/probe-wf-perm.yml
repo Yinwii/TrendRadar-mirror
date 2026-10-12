@@ -12,6 +12,7 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Push a workflow-file change with GITHUB_TOKEN
         run: |
           git config user.name "probe"
@@ -22,7 +23,9 @@ jobs:
           git add .github/workflows/_probe.yaml
           git commit -m "probe: test whether GITHUB_TOKEN can modify workflow files"
           echo "----- push begin -----"
+          set +e
           git push -u origin probe-branch 2>&1
           RC=$?
+          set -e
           echo "----- push exit=$RC -----"
           exit $RC
