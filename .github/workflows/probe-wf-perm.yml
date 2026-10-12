@@ -1,7 +1,9 @@
 name: Probe Workflow Push Permission
 
-# 一次性探针：验证 GITHUB_TOKEN 能否推送「.github/workflows/ 下的文件」。
-# 结论出来后本文件会被删除。
+# 探针 2：区分「逐提交检查」还是「整个 ref 最终差异检查」。
+# 步骤：① 造一个改了 workflow 文件的提交（模拟上游提交）
+#       ② 再提交一次把它还原，使 ref 的最终差异里【没有】workflow 改动
+# 若 push 成功 → 检查的是最终差异；若仍被拒 → 是逐提交检查。
 on:
   workflow_dispatch:
 
@@ -13,15 +15,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Push a workflow-file change with GITHUB_TOKEN
+        with:
+          fetch-depth: 0
+      - name: Probe per-commit vs whole-ref check
         run: |
           git config user.name "probe"
           git config user.email "probe@example.com"
           git checkout -B probe-branch
-          mkdir -p .github/workflows
-          printf '# probe %s\n' "$(date -u +%s)" > .github/workflows/_probe.yaml
-          git add .github/workflows/_probe.yaml
-          git commit -m "probe: test whether GITHUB_TOKEN can modify workflow files"
+          printf '# step1\n' > .github/workflows/_probe2.yaml
+          git add -A
+          git commit -m "simulate upstream: modify a workflow file"
+          git rm -q .github/workflows/_probe2.yaml
+          git commit -m "neutralize: tip tree has no workflow change"
+          echo "----- log -----"; git log --oneline -3
+          echo "----- tip 与 master 的差异（应为空） -----"
+          git diff --name-only origin/master HEAD; echo "[diff-end]"
           echo "----- push begin -----"
           set +e
           git push -u origin probe-branch 2>&1
