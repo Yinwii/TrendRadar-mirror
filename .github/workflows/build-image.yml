@@ -1,3 +1,4 @@
+# scheduler-unfreeze touch 2026-10-12
 name: Build Fork Images to GHCR
 
 # 本 fork 专用的镜像构建流程
