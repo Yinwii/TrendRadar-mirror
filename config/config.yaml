@@ -20,6 +20,11 @@ app:
   timezone: "Asia/Shanghai"
   show_version_update: true           # 是否显示版本更新提示（true=显示, false=隐藏）
 
+  # Web 报告地址（留空则不显示）
+  # 填写后会在每条推送消息用展示完整报告链接，方便手机端点击查看
+  # 示例：https://news.example.com/html/latest/current.html
+  report_url: "http://84.75.76.106:18080/html/latest/current.html"
+
 
 # ===============================================================
 # 1.5 调度系统 —— 什么时间做什么事

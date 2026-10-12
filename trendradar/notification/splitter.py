@@ -152,6 +152,7 @@ def split_content_into_batches(
     ai_stats: Optional[Dict] = None,
     report_type: str = "热点分析报告",
     show_new_section: bool = True,
+    report_url: str = "",
 ) -> List[str]:
     """分批处理消息内容，确保词组标题+至少第一条新闻的完整性（支持热榜+RSS合并+AI分析+独立展示区）
 
@@ -177,6 +178,7 @@ def split_content_into_batches(
         ai_content: AI 分析内容（已渲染的字符串，可选）
         standalone_data: 独立展示区数据（可选），包含 platforms 和 rss_feeds 列表
         ai_stats: AI 分析统计数据（可选），包含 total_news, analyzed_news, max_news_limit 等
+        report_url: Web 报告完整链接（可选，填写后每条消息底部附带）
 
     Returns:
         分批后的消息内容列表
@@ -336,6 +338,8 @@ def split_content_into_batches(
             base_footer += f"\n> TrendRadar 发现新版本 **{update_info['remote_version']}**，当前 **{update_info['current_version']}**"
     elif format_type == "telegram":
         base_footer = f"\n\n更新时间：{now.strftime('%Y-%m-%d %H:%M:%S')}"
+        if report_url:
+            base_footer += f"\n🌐 完整报告：{report_url}"
         if update_info:
             base_footer += f"\nTrendRadar 发现新版本 {update_info['remote_version']}，当前 {update_info['current_version']}"
     elif format_type == "ntfy":

@@ -458,6 +458,7 @@ class AppContext:
             ai_stats=ai_stats,
             report_type=report_type,
             show_new_section=self.show_new_section,
+            report_url=self.config.get("REPORT_URL", ""),
         )
 
     # === 通知发送 ===
