@@ -259,6 +259,34 @@ _NEWSNOW_CSS = """
             .nn-refresh-icon.spin { animation: nn-spin 0.6s linear; }
             @keyframes nn-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
+            /* 毛玻璃质感（设置中开启后，顶栏/卡片/面板半透明+背景模糊，与壁纸融为一体） */
+            #newsnow-view.nn-glass {
+                --nn-card: rgba(255,255,255,0.62);
+                --nn-head-bg: rgba(255,255,255,0.55);
+                --nn-chip-bg: rgba(255,255,255,0.55);
+                --nn-hover: rgba(255,255,255,0.35);
+            }
+            body.dark-mode #newsnow-view.nn-glass,
+            #newsnow-view.nn-glass.force-dark {
+                --nn-card: rgba(27,31,42,0.60);
+                --nn-head-bg: rgba(18,21,28,0.55);
+                --nn-chip-bg: rgba(27,31,42,0.55);
+                --nn-hover: rgba(255,255,255,0.08);
+            }
+            #newsnow-view.nn-glass .nn-card,
+            #newsnow-view.nn-glass .nn-header,
+            #newsnow-view.nn-glass .nn-settings,
+            #newsnow-view.nn-glass .nn-more-panel {
+                backdrop-filter: blur(16px) saturate(1.25);
+                -webkit-backdrop-filter: blur(16px) saturate(1.25);
+            }
+            .nn-settings { max-height: 74vh; overflow-y: auto; }
+
+            /* 来源条拖动 */
+            .nn-chips { cursor: grab; }
+            .nn-chips.dragging { cursor: grabbing; }
+            .nn-chips.expanded { cursor: default; }
+
             /* NewsNow 按钮（宽窄屏按钮左侧） */
             .newsnow-toggle-btn { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; padding: 10px 12px; }
             .newsnow-toggle-btn.active {
@@ -327,6 +355,21 @@ _NEWSNOW_VIEW_TEMPLATE = """
                                 <span class="nn-set-opt" data-v="bing">Bing 每日图</span>
                             </div>
                         </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">卡片质感</span>
+                            <div class="nn-set-opts" data-key="glass">
+                                <span class="nn-set-opt" data-v="solid">实心</span>
+                                <span class="nn-set-opt" data-v="glass">毛玻璃</span>
+                            </div>
+                        </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">壁纸遮罩</span>
+                            <div class="nn-set-opts" data-key="scrim">
+                                <span class="nn-set-opt" data-v="light">浅（突出壁纸）</span>
+                                <span class="nn-set-opt" data-v="medium">中</span>
+                                <span class="nn-set-opt" data-v="deep">深（易读优先）</span>
+                            </div>
+                        </div>
                         <button class="nn-set-reset" id="nn-reset">恢复默认</button>
                     </div>
                     <div class="nn-more-panel" id="nn-more-panel">
@@ -350,7 +393,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
             var NN_SELECTED = 'all';
             var NN_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#84cc16','#10b981','#0ea5e9','#a855f7'];
             var NN_PREFS_KEY = 'trendradar-nn-prefs';
-            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default' };
+            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', glass: 'solid', scrim: 'medium' };
             var NN_TAB = 'hot';
             var NN_FAVS = [];
             var NN_CHIPS_EXPANDED = false;
@@ -410,6 +453,8 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             if (['normal','large'].indexOf(p.font) >= 0) NN_PREFS.font = p.font;
                             if (['white','tint','full'].indexOf(p.card) >= 0) NN_PREFS.card = p.card;
                             if (['default','gradient','bing'].indexOf(p.bg) >= 0) NN_PREFS.bg = p.bg;
+                            if (['solid','glass'].indexOf(p.glass) >= 0) NN_PREFS.glass = p.glass;
+                            if (['light','medium','deep'].indexOf(p.scrim) >= 0) NN_PREFS.scrim = p.scrim;
                         }
                     }
                 } catch (e) {}
@@ -423,6 +468,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 v.classList.remove('force-light', 'force-dark');
                 if (NN_PREFS.theme === 'light') v.classList.add('force-light');
                 if (NN_PREFS.theme === 'dark') v.classList.add('force-dark');
+                v.classList.toggle('nn-glass', NN_PREFS.glass === 'glass');
                 var colw = ({ compact: '280px', normal: '350px', loose: '440px' })[NN_PREFS.density] || '350px';
                 v.style.setProperty('--nn-colw', colw);
                 var fs = ({ normal: '14px', large: '15.5px' })[NN_PREFS.font] || '14px';
@@ -449,7 +495,8 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 var bing = window.NN_BING_URL || '';
 
                 if (mode === 'bing' && bing) {
-                    var scrim = dark ? 'rgba(10,12,18,0.74)' : 'rgba(244,245,247,0.85)';
+                    var alpha = ({ light: 0.45, medium: 0.68, deep: 0.85 })[NN_PREFS.scrim || 'medium'];
+                    var scrim = dark ? 'rgba(10,12,18,' + alpha + ')' : 'rgba(244,245,247,' + alpha + ')';
                     bs.backgroundImage = 'linear-gradient(' + scrim + ',' + scrim + '), url("' + bing + '")';
                     bs.backgroundSize = 'cover';
                     bs.backgroundPosition = 'center center';
@@ -507,7 +554,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 });
             }
             function nnBindSettings() {
-                // 来源条：鼠标滚轮横向滚动
+                // 来源条：鼠标滚轮横向滚动 + 按住拖动
                 var chipsElWheel = document.getElementById('nn-chips');
                 if (chipsElWheel && !chipsElWheel.dataset.nnWheel) {
                     chipsElWheel.dataset.nnWheel = '1';
@@ -518,6 +565,37 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             chipsElWheel.scrollLeft += e.deltaY;
                         }
                     }, { passive: false });
+                    // 按住左键拖动滚动
+                    var drag = { down: false, startX: 0, startLeft: 0, moved: false };
+                    chipsElWheel.addEventListener('mousedown', function (e) {
+                        if (NN_CHIPS_EXPANDED || e.button !== 0) return;
+                        drag.down = true; drag.moved = false;
+                        drag.startX = e.pageX; drag.startLeft = chipsElWheel.scrollLeft;
+                    });
+                    chipsElWheel.addEventListener('mousemove', function (e) {
+                        if (!drag.down) return;
+                        var dx = e.pageX - drag.startX;
+                        if (Math.abs(dx) > 5) {
+                            drag.moved = true;
+                            chipsElWheel.classList.add('dragging');
+                            chipsElWheel.dataset.nnDragged = '1';
+                            e.preventDefault();
+                            chipsElWheel.scrollLeft = drag.startLeft - dx;
+                        }
+                    });
+                    function endDrag() {
+                        drag.down = false;
+                        chipsElWheel.classList.remove('dragging');
+                    }
+                    chipsElWheel.addEventListener('mouseup', endDrag);
+                    chipsElWheel.addEventListener('mouseleave', endDrag);
+                    // 拖动后吞掉误触点击
+                    chipsElWheel.addEventListener('click', function (e) {
+                        if (chipsElWheel.dataset.nnDragged === '1') {
+                            e.stopPropagation(); e.preventDefault();
+                            chipsElWheel.dataset.nnDragged = '0';
+                        }
+                    }, true);
                 }
                 // 顶部主 Tab
                 var tabsEl = document.getElementById('nn-tabs');
@@ -566,7 +644,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 });
                 var reset = document.getElementById('nn-reset');
                 if (reset) reset.addEventListener('click', function () {
-                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default' };
+                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', glass: 'solid', scrim: 'medium' };
                     nnSavePrefs();
                     nnApplyPrefs();
                 });
