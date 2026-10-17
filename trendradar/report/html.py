@@ -204,7 +204,24 @@ _NEWSNOW_CSS = """
             .nn-caret { margin-left: 2px; font-size: 11px; color: var(--nn-faint); display: inline-block; transition: transform 0.15s ease; }
             .nn-card.nn-collapsed .nn-caret { transform: rotate(-90deg); }
             .nn-card.nn-collapsed .nn-item { display: none; }
+            .nn-card.nn-collapsed .nn-card-foot { display: none; }
             .nn-card-head { cursor: pointer; }
+
+            /* 卡片底部：展开/收起剩余条数（后台或本地设置「卡片条数」后出现） */
+            .nn-card-foot {
+                display: flex; align-items: center; justify-content: center;
+                padding: 6px 16px 10px; border-top: 1px dashed var(--nn-border);
+            }
+            .nn-card-more {
+                display: inline-flex; align-items: center; gap: 5px;
+                border: none; background: transparent; color: var(--nn-sub);
+                font-size: 12.5px; font-family: inherit; cursor: pointer;
+                padding: 4px 12px; border-radius: 8px; transition: all .12s ease;
+            }
+            .nn-card-more:hover { background: var(--nn-item-hover); color: var(--nn-text); }
+            .nn-card-more .nn-caret-sm { font-size: 10px; transition: transform .15s ease; }
+            .nn-card-more.open .nn-caret-sm { transform: rotate(180deg); }
+            .nn-card-more .nn-more-rest { color: var(--nn-faint); }
 
             /* 顶栏圆角 / 悬浮样式 */
             #newsnow-view.nn-head-float .nn-header {
@@ -315,6 +332,10 @@ _NEWSNOW_CSS = """
             .nn-more-item .nn-move:hover { border-color: var(--nn-border); color: var(--nn-text); background: var(--nn-card); }
             .nn-more-item .nn-move[disabled] { opacity: 0.25; cursor: default; }
             .nn-more-idx { min-width: 18px; text-align: right; font-size: 11px; color: var(--nn-faint); font-variant-numeric: tabular-nums; }
+            .nn-drag { color: var(--nn-faint); font-size: 10px; letter-spacing: -2px; cursor: grab; user-select: none; }
+            .nn-more-item.dragging { opacity: 0.45; }
+            .nn-more-item.drop-before { box-shadow: inset 0 2px 0 0 #8ab4f8; }
+            .nn-more-item.drop-after { box-shadow: inset 0 -2px 0 0 #8ab4f8; }
 
             /* 卡片头按钮（收藏 / 刷新） */
             .nn-card-btn {
@@ -463,6 +484,16 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             </div>
                         </div>
                         <div class="nn-set-row">
+                            <span class="nn-set-label">卡片条数</span>
+                            <div class="nn-set-opts" data-key="cardLimit">
+                                <span class="nn-set-opt" data-v="off">不限</span>
+                                <span class="nn-set-opt" data-v="10">10</span>
+                                <span class="nn-set-opt" data-v="15">15</span>
+                                <span class="nn-set-opt" data-v="20">20</span>
+                                <span class="nn-set-opt" data-v="30">30</span>
+                            </div>
+                        </div>
+                        <div class="nn-set-row">
                             <span class="nn-set-label">壁纸遮罩</span>
                             <div class="nn-set-opts" data-key="scrim">
                                 <span class="nn-set-opt" data-v="light">浅（突出壁纸）</span>
@@ -504,7 +535,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
             var NN_SELECTED = 'all';
             var NN_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#84cc16','#10b981','#0ea5e9','#a855f7'];
             var NN_PREFS_KEY = 'trendradar-nn-prefs';
-            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', alpha: 'solid', radius: 'none', srcSort: 'count', hotwords: 'off', scrim: 'medium' };
+            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', alpha: 'solid', radius: 'none', srcSort: 'count', hotwords: 'off', scrim: 'medium', cardLimit: 'off' };
             var NN_TAB = 'hot';
             var NN_FAVS = [];
             var NN_CHIPS_EXPANDED = false;
@@ -512,20 +543,24 @@ _NEWSNOW_VIEW_TEMPLATE = """
             var NN_ALL_COLLAPSED = false;
             var NN_SRC_ORDER = [];
             var NN_SRC_ORDER_KEY = 'trendradar-nn-srcorder';
+            var NN_CARD_OPEN = {};   // 当前会话内被展开的卡片（刷新页面恢复按设置截断）
 
             // ===== 管理员全局配置（后台可下发默认值并锁定）=====
             var NN_GLOBAL = window.NN_GLOBAL || {};
             NN_GLOBAL.defaults = (NN_GLOBAL.defaults && typeof NN_GLOBAL.defaults === 'object') ? NN_GLOBAL.defaults : {};
             NN_GLOBAL.sourcesOrder = Array.isArray(NN_GLOBAL.sourcesOrder) ? NN_GLOBAL.sourcesOrder : [];
+            NN_GLOBAL.disabledSources = Array.isArray(NN_GLOBAL.disabledSources) ? NN_GLOBAL.disabledSources : [];
             NN_GLOBAL.lock = (NN_GLOBAL.lock && typeof NN_GLOBAL.lock === 'object') ? NN_GLOBAL.lock : { mode: 'soft', keys: [] };
             if (!Array.isArray(NN_GLOBAL.lock.keys)) NN_GLOBAL.lock.keys = [];
+            // 后台停用的来源：整站不展示（含顶部来源按钮）
+            function nnIsDisabled(name) { return NN_GLOBAL.disabledSources.indexOf(name) >= 0; }
             function nnIsLocked(key) {
                 if (!key) return false;
                 if (NN_GLOBAL.lock.mode === 'hard') return true;
                 return NN_GLOBAL.lock.keys.indexOf(key) >= 0;
             }
             function nnGlobalAvailable() {
-                return !!(NN_GLOBAL && (NN_GLOBAL.updated_at || NN_GLOBAL.sourcesOrder.length || NN_GLOBAL.lock.keys.length || NN_GLOBAL.lock.mode === 'hard'));
+                return !!(NN_GLOBAL && (NN_GLOBAL.updated_at || NN_GLOBAL.sourcesOrder.length || NN_GLOBAL.disabledSources.length || NN_GLOBAL.lock.keys.length || NN_GLOBAL.lock.mode === 'hard'));
             }
 
             function nnLoadOrder() {
@@ -570,6 +605,37 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 NN_PREFS.srcSort = 'custom';
                 nnSaveOrder();
                 nnSavePrefs();
+                nnRender();
+            }
+            // 置顶 / 置底
+            function nnMoveSourceTo(name, pos) {
+                if (nnIsLocked('srcSort')) return;
+                if (!NN_SRC_ORDER.length) {
+                    NN_SRC_ORDER = window.__nnLastOrder ? window.__nnLastOrder.slice() : [];
+                }
+                var i = NN_SRC_ORDER.indexOf(name);
+                if (i < 0) { NN_SRC_ORDER.push(name); i = NN_SRC_ORDER.length - 1; }
+                NN_SRC_ORDER.splice(i, 1);
+                if (pos === 'top') NN_SRC_ORDER.unshift(name);
+                else NN_SRC_ORDER.push(name);
+                NN_PREFS.srcSort = 'custom';
+                nnSaveOrder();
+                nnSavePrefs();
+                nnRender();
+            }
+            // 直接以一组名称作为新顺序（拖拽排序用）
+            function nnSetOrderFrom(list) {
+                if (nnIsLocked('srcSort')) return;
+                NN_SRC_ORDER = list.slice();
+                NN_PREFS.srcSort = 'custom';
+                nnSaveOrder();
+                nnSavePrefs();
+                nnRender();
+            }
+            // 卡片展开 / 收起（只影响当前会话）
+            function nnToggleCardOpen(name) {
+                if (NN_CARD_OPEN[name]) delete NN_CARD_OPEN[name];
+                else NN_CARD_OPEN[name] = 1;
                 nnRender();
             }
 
@@ -658,6 +724,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             if (!nnIsLocked('srcSort') && ['count','name','custom'].indexOf(p.srcSort) >= 0) NN_PREFS.srcSort = p.srcSort;
                             if (!nnIsLocked('hotwords') && ['off','5','10','20'].indexOf(p.hotwords) >= 0) NN_PREFS.hotwords = p.hotwords;
                             if (!nnIsLocked('scrim') && ['light','medium','deep'].indexOf(p.scrim) >= 0) NN_PREFS.scrim = p.scrim;
+                            if (!nnIsLocked('cardLimit') && (/^(off|[5-9]|[1-9][0-9]|100)$/).test(String(p.cardLimit))) NN_PREFS.cardLimit = String(p.cardLimit);
                         }
                     }
                 } catch (e) {}
@@ -681,9 +748,11 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         if (!changed) return;
                         NN_GLOBAL.defaults = incoming.defaults || {};
                         NN_GLOBAL.sourcesOrder = Array.isArray(incoming.sourcesOrder) ? incoming.sourcesOrder : [];
+                        NN_GLOBAL.disabledSources = Array.isArray(incoming.disabledSources) ? incoming.disabledSources : [];
                         NN_GLOBAL.lock = incoming.lock || { mode: 'soft', keys: [] };
                         NN_GLOBAL.updated_at = incoming.updated_at || '';
                         if (!NN_SRC_ORDER.length && NN_GLOBAL.sourcesOrder.length) NN_SRC_ORDER = NN_GLOBAL.sourcesOrder.slice();
+                        if (NN_SELECTED !== 'all' && nnIsDisabled(NN_SELECTED)) NN_SELECTED = 'all';
                         nnLoadPrefs();
                         nnApplyPrefs();
                         nnRender();
@@ -767,7 +836,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 var panel = document.getElementById('nn-settings');
                 if (!panel) return;
                 var lockedLabels = [];
-                var labelMap = { theme: '主题', density: '密度', font: '字号', card: '卡片', bg: '背景', alpha: '透明度', radius: '圆角', srcSort: '来源排序', hotwords: '热词', scrim: '遮罩' };
+                var labelMap = { theme: '主题', density: '密度', font: '字号', card: '卡片', bg: '背景', alpha: '透明度', radius: '圆角', srcSort: '来源排序', hotwords: '热词', scrim: '遮罩', cardLimit: '卡片条数' };
                 panel.querySelectorAll('.nn-set-opts').forEach(function (group) {
                     var key = group.getAttribute('data-key');
                     group.querySelectorAll('.nn-set-opt').forEach(function (opt) {
@@ -950,7 +1019,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 });
                 var reset = document.getElementById('nn-reset');
                 if (reset) reset.addEventListener('click', function () {
-                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', alpha: 'solid', radius: 'none', srcSort: 'count', hotwords: 'off', scrim: 'medium' };
+                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', alpha: 'solid', radius: 'none', srcSort: 'count', hotwords: 'off', scrim: 'medium', cardLimit: 'off' };
                     nnLoadPrefs();  // 回到「全局默认 + 本地（未锁定项）」
                     nnSavePrefs();
                     nnApplyPrefs();
@@ -984,12 +1053,17 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 if (!chipsEl || !gridEl) return;
 
                 // ---- chips ----
-                var cards = data.cards.slice().sort(function (a, b) { return b.items.length - a.items.length; });
+                // 后台停用的来源整站隐藏（顶部按钮、卡片、目录都不出现）
+                var cards = data.cards.filter(function (c) { return !nnIsDisabled(c.name); })
+                    .sort(function (a, b) { return b.items.length - a.items.length; });
+                var visibleTotal = 0;
+                cards.forEach(function (c) { visibleTotal += c.items.length; });
+                if (NN_SELECTED !== 'all' && nnIsDisabled(NN_SELECTED)) NN_SELECTED = 'all';
                 if (NN_PREFS.srcSort === 'custom') cards = nnApplyCustomOrder(cards);
                 var chipCards = cards.slice();
                 if (NN_PREFS.srcSort === 'name') chipCards.sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'zh-Hans-CN'); });
                 window.__nnLastOrder = chipCards.map(function (c) { return c.name; });
-                var html = '<span class="nn-chip' + (NN_SELECTED === 'all' ? ' active' : '') + '" data-src="all">全部<span class="nn-chip-count">' + data.total + '</span></span>';
+                var html = '<span class="nn-chip' + (NN_SELECTED === 'all' ? ' active' : '') + '" data-src="all">全部<span class="nn-chip-count">' + visibleTotal + '</span></span>';
                 for (var i = 0; i < chipCards.length; i++) {
                     var c = chipCards[i];
                     html += '<span class="nn-chip' + (NN_SELECTED === c.name ? ' active' : '') + '" data-src="' + nnEsc(c.name) + '">'
@@ -1017,7 +1091,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     var hwN = parseInt(NN_PREFS.hotwords, 10) || 0;
                     if (!hwN) { hwEl.style.display = 'none'; hwEl.innerHTML = ''; }
                     else {
-                        var tops = nnComputeHotwords(data).slice(0, hwN);
+                        var tops = nnComputeHotwords({ cards: cards }).slice(0, hwN);
                         var hwHtml = '<span class="nn-hot-label">🔥 热词</span>';
                         tops.forEach(function (t) {
                             hwHtml += '<span class="nn-hot-chip' + (NN_QUERY === t[0] ? ' active' : '') + '" data-w="' + nnEsc(t[0]) + '">' + nnEsc(t[0]) + '<span class="nn-chip-count">' + t[1] + '</span></span>';
@@ -1076,6 +1150,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         : '暂无数据') + '</div>';
                 } else {
                     var out = '';
+                    var cardLimit = parseInt(NN_PREFS.cardLimit, 10) || 0;  // 0 = 不限制
                     show.forEach(function (card) {
                         var items;
                         if (NN_TAB === 'live') {
@@ -1088,6 +1163,8 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             });
                         }
                         var faved = nnIsFav(card.name);
+                        var isOpen = !!NN_CARD_OPEN[card.name];
+                        var cut = (cardLimit && items.length > cardLimit && !isOpen) ? cardLimit : items.length;
                         var headStyle = (NN_PREFS.card === 'white') ? '' : ' style="background:' + nnTint(card.name) + '"';
                         var cardStyle = (NN_PREFS.card === 'full')
                             ? ' style="background:' + nnTint(card.name, 0.07) + ';border-color:' + nnTint(card.name, 0.3) + '"'
@@ -1101,6 +1178,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             +  '<span class="nn-caret" title="收起 / 展开">&#9662;</span>'
                             +  '</div>';
                         items.forEach(function (it, idx) {
+                            if (idx >= cut) return;
                             var n = idx + 1;
                             var rc = n === 1 ? ' r1' : (n === 2 ? ' r2' : (n === 3 ? ' r3' : ''));
                             var meta = [];
@@ -1115,9 +1193,23 @@ _NEWSNOW_VIEW_TEMPLATE = """
                                 +  (meta.length ? '<span class="nn-meta">' + nnEsc(meta.join(' · ')) + '</span>' : '')
                                 +  '</div>';
                         });
+                        if (cardLimit && items.length > cardLimit) {
+                            out += '<div class="nn-card-foot">'
+                                +  '<button class="nn-card-more' + (isOpen ? ' open' : '') + '" data-open="' + nnEsc(card.name) + '" title="' + (isOpen ? '收起到 ' + cardLimit + ' 条' : '展开完整的 ' + items.length + ' 条') + '">'
+                                +  (isOpen ? '收起' : '展开全部')
+                                +  (isOpen ? '' : '<span class="nn-more-rest">+' + (items.length - cardLimit) + ' 条</span>')
+                                +  '<span class="nn-caret-sm">&#9662;</span>'
+                                +  '</button></div>';
+                        }
                         out += '</div>';
                     });
                     gridEl.innerHTML = out;
+                    gridEl.querySelectorAll('[data-open]').forEach(function (b) {
+                        b.addEventListener('click', function (e) {
+                            e.preventDefault(); e.stopPropagation();
+                            nnToggleCardOpen(b.getAttribute('data-open'));
+                        });
+                    });
                     gridEl.querySelectorAll('[data-fav]').forEach(function (b) {
                         b.addEventListener('click', function (e) {
                             e.preventDefault(); e.stopPropagation();
@@ -1152,12 +1244,15 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     var orderResetBtn = document.getElementById('nn-order-reset');
                     var listOrder = nnApplyCustomOrder(cards);
                     listOrder.forEach(function (c, mi) {
-                        mh += '<div class="nn-more-item" data-pick="' + nnEsc(c.name) + '">'
+                        mh += '<div class="nn-more-item" data-pick="' + nnEsc(c.name) + '" data-name="' + nnEsc(c.name) + '" draggable="' + (orderLocked ? 'false' : 'true') + '">'
+                            +  '<span class="nn-drag" title="拖动调整顺序">&#8942;&#8942;</span>'
                             +  '<span class="nn-more-idx">' + (mi + 1) + '</span>'
                             +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + nnEsc(c.name)
                             +  '<span class="nn-count">' + c.items.length + ' 条</span>'
+                            +  '<button class="nn-card-btn nn-move" data-totop="1" data-name="' + nnEsc(c.name) + '" title="置顶"' + ((mi === 0 || orderLocked) ? ' disabled' : '') + '>&#8689;</button>'
                             +  '<button class="nn-card-btn nn-move" data-move="-1" data-name="' + nnEsc(c.name) + '" title="上移"' + ((mi === 0 || orderLocked) ? ' disabled' : '') + '>&#9650;</button>'
                             +  '<button class="nn-card-btn nn-move" data-move="1" data-name="' + nnEsc(c.name) + '" title="下移"' + ((mi === listOrder.length - 1 || orderLocked) ? ' disabled' : '') + '>&#9660;</button>'
+                            +  '<button class="nn-card-btn nn-move" data-tobottom="1" data-name="' + nnEsc(c.name) + '" title="置底"' + ((mi === listOrder.length - 1 || orderLocked) ? ' disabled' : '') + '>&#8690;</button>'
                             +  '<button class="nn-card-btn' + (nnIsFav(c.name) ? ' faved' : '') + '" data-fav="' + nnEsc(c.name) + '" title="收藏该来源">' + (nnIsFav(c.name) ? '★' : '☆') + '</button>'
                             +  '</div>';
                     });
@@ -1165,7 +1260,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     if (mhint) {
                         mhint.innerHTML = orderLocked
                             ? '顺序由<b>后台统一设定</b>'
-                            : '用 <b>↑ ↓</b> 调整顺序';
+                            : '拖动行，或用 <b>⇱ ▲ ▼ ⇲</b> 调整顺序';
                     }
                     if (orderResetBtn) orderResetBtn.style.display = orderLocked ? 'none' : '';
                     moreList.innerHTML = mh || '<div class="nn-empty">暂无来源</div>';
@@ -1183,6 +1278,68 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             nnMoveSource(b.getAttribute('data-name'), parseInt(b.getAttribute('data-move'), 10) || 0);
                         });
                     });
+                    moreList.querySelectorAll('[data-totop]').forEach(function (b) {
+                        b.addEventListener('click', function (e) {
+                            e.stopPropagation(); e.preventDefault();
+                            if (b.disabled) return;
+                            nnMoveSourceTo(b.getAttribute('data-name'), 'top');
+                        });
+                    });
+                    moreList.querySelectorAll('[data-tobottom]').forEach(function (b) {
+                        b.addEventListener('click', function (e) {
+                            e.stopPropagation(); e.preventDefault();
+                            if (b.disabled) return;
+                            nnMoveSourceTo(b.getAttribute('data-name'), 'bottom');
+                        });
+                    });
+                    // 拖拽排序（HTML5 DnD，鼠标端；触屏用上面的按钮）
+                    if (!orderLocked) {
+                        var dragName = '';
+                        moreList.querySelectorAll('.nn-more-item').forEach(function (row) {
+                            row.addEventListener('dragstart', function (e) {
+                                dragName = row.getAttribute('data-name');
+                                row.classList.add('dragging');
+                                try {
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    e.dataTransfer.setData('text/plain', dragName);
+                                } catch (err) {}
+                            });
+                            row.addEventListener('dragend', function () {
+                                row.classList.remove('dragging');
+                                moreList.querySelectorAll('.nn-more-item').forEach(function (r) {
+                                    r.classList.remove('drop-before', 'drop-after');
+                                });
+                            });
+                            row.addEventListener('dragover', function (e) {
+                                if (!dragName || row.getAttribute('data-name') === dragName) return;
+                                e.preventDefault();
+                                var r = row.getBoundingClientRect();
+                                var after = (e.clientY - r.top) > r.height / 2;
+                                row.classList.toggle('drop-before', !after);
+                                row.classList.toggle('drop-after', after);
+                            });
+                            row.addEventListener('dragleave', function () {
+                                row.classList.remove('drop-before', 'drop-after');
+                            });
+                            row.addEventListener('drop', function (e) {
+                                e.preventDefault();
+                                var target = row.getAttribute('data-name');
+                                var r = row.getBoundingClientRect();
+                                var after = (e.clientY - r.top) > r.height / 2;
+                                row.classList.remove('drop-before', 'drop-after');
+                                if (!dragName || target === dragName) return;
+                                var seq = (window.__nnLastOrder || []).slice();
+                                var from = seq.indexOf(dragName);
+                                if (from < 0) return;
+                                seq.splice(from, 1);
+                                var to = seq.indexOf(target);
+                                if (to < 0) to = seq.length - 1;
+                                seq.splice(after ? to + 1 : to, 0, dragName);
+                                dragName = '';
+                                nnSetOrderFrom(seq);
+                            });
+                        });
+                    }
                     moreList.querySelectorAll('[data-pick]').forEach(function (row) {
                         row.addEventListener('click', function () {
                             NN_SELECTED = row.getAttribute('data-pick');
@@ -1197,7 +1354,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     if (q) {
                         summaryEl.textContent = '搜索 “' + NN_QUERY.trim() + '”：' + (show._qTotal || 0) + ' 条命中 · ' + show.length + ' 个来源';
                     } else {
-                        summaryEl.textContent = '共 ' + data.total + ' 条热点 · ' + show.length + ' 个来源 · 更新于 ' + (data.generated_at || '--');
+                        summaryEl.textContent = '共 ' + visibleTotal + ' 条热点 · ' + show.length + ' 个来源 · 更新于 ' + (data.generated_at || '--');
                     }
                 }
             }

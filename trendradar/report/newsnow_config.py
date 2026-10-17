@@ -38,6 +38,8 @@ ENUMS: Dict[str, List[str]] = {
     "srcSort": ["count", "name", "custom"],
     "hotwords": ["off", "5", "10", "20"],
     "scrim": ["medium", "light", "deep"],
+    # 每个卡片默认展示的条数；off = 不限制（全量展开）。也允许 5~100 的自定义数字
+    "cardLimit": ["off", "10", "15", "20", "30"],
 }
 
 DEFAULT_PREFS: Dict[str, str] = {k: v[0] for k, v in ENUMS.items()}
@@ -47,8 +49,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "updated_at": "",
     "defaults": dict(DEFAULT_PREFS),
     "sourcesOrder": [],
+    "disabledSources": [],
     "lock": {"mode": "soft", "keys": []},
 }
+
+MAX_CARD_LIMIT = 100
+MAX_DISABLED = 300
 
 LOCK_MODES = ["soft", "hard"]
 
@@ -93,12 +99,33 @@ def _ensure_dir() -> Path:
 # 校验
 # ---------------------------------------------------------------------------
 
+def _clean_card_limit(raw: Any) -> str:
+    """卡片默认条数：off 或 5~100 的整数（统一存成字符串，方便前端直接比对）。"""
+    if isinstance(raw, (int, float)):
+        n = int(raw)
+    elif isinstance(raw, str):
+        s = raw.strip().lower()
+        if s in ("", "off", "all", "0", "none"):
+            return "off"
+        try:
+            n = int(s)
+        except ValueError:
+            return "off"
+    else:
+        return "off"
+    if n <= 0:
+        return "off"
+    return str(max(5, min(MAX_CARD_LIMIT, n)))
+
+
 def _clean_prefs(raw: Any) -> Dict[str, str]:
     out = dict(DEFAULT_PREFS)
     if isinstance(raw, dict):
         for k, allowed in ENUMS.items():
             v = raw.get(k)
-            if isinstance(v, str) and v in allowed:
+            if k == "cardLimit":
+                out[k] = _clean_card_limit(v)
+            elif isinstance(v, str) and v in allowed:
                 out[k] = v
             elif isinstance(v, (int, float)) and str(v) in allowed:
                 out[k] = str(v)
@@ -106,6 +133,10 @@ def _clean_prefs(raw: Any) -> Dict[str, str]:
 
 
 def _clean_order(raw: Any) -> List[str]:
+    return _clean_names(raw, _MAX_ORDER)
+
+
+def _clean_names(raw: Any, limit: int) -> List[str]:
     out: List[str] = []
     seen = set()
     if isinstance(raw, list):
@@ -117,7 +148,7 @@ def _clean_order(raw: Any) -> List[str]:
                 continue
             seen.add(name)
             out.append(name)
-            if len(out) >= _MAX_ORDER:
+            if len(out) >= limit:
                 break
     return out
 
@@ -145,6 +176,7 @@ def clean_config(raw: Any) -> Dict[str, Any]:
         "updated_at": str(data.get("updated_at") or "")[:32],
         "defaults": _clean_prefs(data.get("defaults")),
         "sourcesOrder": _clean_order(data.get("sourcesOrder")),
+        "disabledSources": _clean_names(data.get("disabledSources"), MAX_DISABLED),
         "lock": _clean_lock(data.get("lock")),
     }
 
@@ -199,6 +231,7 @@ def public_view() -> Dict[str, Any]:
     view = {
         "defaults": cfg["defaults"],
         "sourcesOrder": cfg["sourcesOrder"],
+        "disabledSources": cfg["disabledSources"],
         "lock": cfg["lock"],
         "updated_at": cfg["updated_at"],
     }

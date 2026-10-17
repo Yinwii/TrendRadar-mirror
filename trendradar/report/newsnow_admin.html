@@ -94,6 +94,29 @@
     .order-item .idx { width: 22px; color: var(--faint); font-size: 11.5px; font-variant-numeric: tabular-nums; text-align: right; }
     .order-item .name { flex: 1; font-size: 13px; }
     .order-item .cnt { color: var(--faint); font-size: 11.5px; }
+    .order-item[draggable=true] { cursor: grab; }
+    .order-item.dragging { opacity: .45; }
+    .order-item.drop-before { box-shadow: inset 0 2px 0 0 var(--accent-2); }
+    .order-item.drop-after { box-shadow: inset 0 -2px 0 0 var(--accent-2); }
+    .handle { color: var(--faint); font-size: 11px; letter-spacing: -2px; user-select: none; cursor: grab; }
+    .order-item.off .name { text-decoration: line-through; color: var(--faint); }
+
+    .src-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; max-height: 360px; overflow: auto; padding-right: 4px; }
+    .src-cell {
+        display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+        background: var(--panel-2); border: 1px solid transparent; border-radius: 8px;
+        cursor: pointer; font-size: 13px; user-select: none;
+    }
+    .src-cell:hover { border-color: var(--line); }
+    .src-cell input { accent-color: var(--accent); cursor: pointer; }
+    .src-cell .cnt { margin-left: auto; font-size: 11px; color: var(--faint); }
+    .src-cell.off { opacity: .5; }
+    .src-cell.off .nm { text-decoration: line-through; }
+    .num-in {
+        width: 72px; min-width: 0; padding: 5px 8px; border-radius: 8px;
+        background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+        font-size: 12.5px; font-family: inherit; text-align: center;
+    }
     .mini {
         border: 1px solid var(--line); background: var(--panel); color: var(--sub);
         width: 24px; height: 24px; border-radius: 6px; cursor: pointer; font-size: 11px; line-height: 1;
@@ -176,13 +199,30 @@
 
     <div class="card">
         <h2>来源顺序</h2>
-        <div class="desc">全局顺序作用于顶部来源按钮与卡片排布；访客本地没有自定义顺序时以此为准。</div>
+        <div class="desc">
+            一份顺序同时驱动<b>顶部来源按钮</b>与<b>卡片模块</b>的排列，两者始终一致。
+            直接拖动行即可排序，也可用行尾按钮 ⇱ 置顶 / ▲ 上移 / ▼ 下移 / ⇲ 置底。
+        </div>
         <div class="toolbar" style="margin-bottom:10px">
             <button class="btn ghost" id="btn-sync">从当前报告同步来源</button>
             <button class="btn ghost" id="btn-clear">清空（按热度）</button>
             <span class="hint" id="order-hint"></span>
         </div>
         <div class="order-list" id="order-list"></div>
+    </div>
+
+    <div class="card">
+        <h2>来源启用</h2>
+        <div class="desc">
+            取消勾选的来源会从页面彻底隐藏——顶部来源按钮、卡片模块、来源目录都不再出现。
+            顺序里被停用的来源会保留位置，重新启用后回到原位。
+        </div>
+        <div class="toolbar" style="margin-bottom:10px">
+            <button class="btn ghost" id="btn-all-on">全部启用</button>
+            <button class="btn ghost" id="btn-all-off">全部停用</button>
+            <span class="hint" id="src-hint"></span>
+        </div>
+        <div class="src-grid" id="src-grid"></div>
     </div>
 
     <div class="card">
@@ -224,12 +264,14 @@
         ['radius', '顶栏圆角', [['none', '直角'], ['sm', '小'], ['md', '中'], ['lg', '大']]],
         ['srcSort', '来源排序', [['count', '按热度'], ['name', '按名称'], ['custom', '自定义']]],
         ['hotwords', '热词数量', [['off', '关'], ['5', 'Top5'], ['10', 'Top10'], ['20', 'Top20']]],
+        ['cardLimit', '卡片条数', [['off', '不限'], ['10', '10'], ['15', '15'], ['20', '20'], ['30', '30']]],
         ['scrim', '壁纸遮罩', [['medium', '中'], ['light', '浅'], ['deep', '深']]]
     ];
     var TOKEN_KEY = 'trendradar-nn-admin-token';
     var cfg = null;
     var sources = [];
     var order = [];
+    var disabled = [];
 
     function $(id) { return document.getElementById(id); }
     function esc(s) {
@@ -260,6 +302,13 @@
                 var active = String(cfg.defaults[key]) === o[0];
                 html += '<span class="opt' + (active ? ' active' : '') + '" data-v="' + o[0] + '">' + o[1] + '</span>';
             });
+            if (key === 'cardLimit') {
+                var cur = String(cfg.defaults.cardLimit == null ? 'off' : cfg.defaults.cardLimit);
+                var preset = ['off', '10', '15', '20', '30'];
+                html += '<input class="num-in" type="number" min="5" max="100" step="1" id="num-cardLimit"'
+                    +  ' placeholder="自定义" title="自定义 5~100 条"'
+                    +  ' value="' + (preset.indexOf(cur) >= 0 ? '' : esc(cur)) + '">';
+            }
             html += '</div><div class="lockcell"><label><input type="checkbox" class="lockbox" data-key="' + key + '"'
                 + ((lockAll || cfg.lock.keys.indexOf(key) >= 0) ? ' checked' : '') + (lockAll ? ' disabled' : '')
                 + '>锁定</label></div></div>';
@@ -273,10 +322,22 @@
                     cfg.defaults[key] = o.getAttribute('data-v');
                     row.querySelectorAll('.opt').forEach(function (x) { x.classList.remove('active'); });
                     o.classList.add('active');
+                    if (key === 'cardLimit') { var ni = $('num-cardLimit'); if (ni) ni.value = ''; }
                     state('有未保存的更改', '');
                 });
             });
         });
+        var numIn = $('num-cardLimit');
+        if (numIn) {
+            numIn.addEventListener('change', function () {
+                var n = parseInt(numIn.value, 10);
+                if (!n || n < 5 || n > 100) { numIn.value = ''; return; }
+                cfg.defaults.cardLimit = String(n);
+                var row = numIn.closest('.row');
+                if (row) row.querySelectorAll('.opt').forEach(function (x) { x.classList.remove('active'); });
+                state('有未保存的更改', '');
+            });
+        }
         box.querySelectorAll('.lockbox').forEach(function (cb) {
             cb.addEventListener('change', function () {
                 var key = cb.getAttribute('data-key');
@@ -303,26 +364,41 @@
         });
     }
 
+    function allNames() {
+        var seen = {}, out = [];
+        function push(n) { if (n && !seen[n]) { seen[n] = 1; out.push(n); } }
+        order.forEach(push);
+        sources.forEach(function (s) { push(s.name); });
+        disabled.forEach(push);
+        return out;
+    }
+
     function renderOrder() {
         var box = $('order-list');
         if (!order.length) {
             box.innerHTML = '<div class="hint" style="padding:8px 4px">暂无顺序设置：点「从当前报告同步来源」拉取，或直接留空使用按热度排序。</div>';
+            renderSources();
             return;
         }
         var html = '';
         order.forEach(function (name, i) {
             var src = sources.filter(function (s) { return s.name === name; })[0];
-            html += '<div class="order-item" data-i="' + i + '">'
+            var off = disabled.indexOf(name) >= 0;
+            html += '<div class="order-item' + (off ? ' off' : '') + '" data-i="' + i + '" data-name="' + esc(name) + '" draggable="true">'
+                + '<span class="handle" title="拖动调整顺序">⋮⋮</span>'
                 + '<span class="idx">' + (i + 1) + '</span>'
-                + '<span class="name">' + esc(name) + '</span>'
+                + '<span class="name">' + esc(name) + (off ? ' · 已停用' : '') + '</span>'
                 + (src ? '<span class="cnt">' + src.count + ' 条</span>' : '<span class="cnt">未在报告中</span>')
-                + '<button class="mini" data-move="-1"' + (i === 0 ? ' disabled' : '') + '>▲</button>'
-                + '<button class="mini" data-move="1"' + (i === order.length - 1 ? ' disabled' : '') + '>▼</button>'
-                + '<button class="mini" data-top="1"' + (i === 0 ? ' disabled' : '') + '>⇱</button>'
-                + '<button class="mini" data-del="1">✕</button>'
+                + '<button class="mini" data-top="1" title="置顶"' + (i === 0 ? ' disabled' : '') + '>⇱</button>'
+                + '<button class="mini" data-move="-1" title="上移"' + (i === 0 ? ' disabled' : '') + '>▲</button>'
+                + '<button class="mini" data-move="1" title="下移"' + (i === order.length - 1 ? ' disabled' : '') + '>▼</button>'
+                + '<button class="mini" data-bottom="1" title="置底"' + (i === order.length - 1 ? ' disabled' : '') + '>⇲</button>'
+                + '<button class="mini" data-del="1" title="仅从顺序中移除（不影响启用）">✕</button>'
                 + '</div>';
         });
         box.innerHTML = html;
+        $('order-hint').textContent = order.length + ' 个来源已排序 · 可拖动';
+
         box.querySelectorAll('.order-item').forEach(function (row) {
             var i = parseInt(row.getAttribute('data-i'), 10);
             row.querySelectorAll('[data-move]').forEach(function (b) {
@@ -339,12 +415,99 @@
                 order.unshift(v);
                 renderOrder(); state('有未保存的更改', '');
             };
+            var bottom = row.querySelector('[data-bottom]');
+            if (bottom) bottom.onclick = function () {
+                var v = order.splice(i, 1)[0];
+                order.push(v);
+                renderOrder(); state('有未保存的更改', '');
+            };
             row.querySelector('[data-del]').onclick = function () {
                 order.splice(i, 1);
                 renderOrder(); state('有未保存的更改', '');
             };
         });
-        $('order-hint').textContent = order.length + ' 个来源已排序';
+
+        // 拖动排序（HTML5 DnD）
+        var dragName = '';
+        box.querySelectorAll('.order-item').forEach(function (row) {
+            row.addEventListener('dragstart', function (e) {
+                dragName = row.getAttribute('data-name');
+                row.classList.add('dragging');
+                try {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', dragName);
+                } catch (err) {}
+            });
+            row.addEventListener('dragend', function () {
+                row.classList.remove('dragging');
+                box.querySelectorAll('.order-item').forEach(function (r) {
+                    r.classList.remove('drop-before', 'drop-after');
+                });
+            });
+            row.addEventListener('dragover', function (e) {
+                if (!dragName || row.getAttribute('data-name') === dragName) return;
+                e.preventDefault();
+                var r = row.getBoundingClientRect();
+                var after = (e.clientY - r.top) > r.height / 2;
+                row.classList.toggle('drop-before', !after);
+                row.classList.toggle('drop-after', after);
+            });
+            row.addEventListener('dragleave', function () {
+                row.classList.remove('drop-before', 'drop-after');
+            });
+            row.addEventListener('drop', function (e) {
+                e.preventDefault();
+                var target = row.getAttribute('data-name');
+                var r = row.getBoundingClientRect();
+                var after = (e.clientY - r.top) > r.height / 2;
+                row.classList.remove('drop-before', 'drop-after');
+                if (!dragName || target === dragName) return;
+                var from = order.indexOf(dragName);
+                if (from < 0) return;
+                order.splice(from, 1);
+                var to = order.indexOf(target);
+                if (to < 0) to = order.length - 1;
+                order.splice(after ? to + 1 : to, 0, dragName);
+                dragName = '';
+                renderOrder();
+                state('有未保存的更改', '');
+            });
+        });
+
+        renderSources();
+    }
+
+    function renderSources() {
+        var box = $('src-grid');
+        if (!box) return;
+        var names = allNames();
+        if (!names.length) {
+            box.innerHTML = '<div class="hint" style="padding:6px 2px">还没有来源列表：先点上方「从当前报告同步来源」。</div>';
+            $('src-hint').textContent = '';
+            return;
+        }
+        var html = '';
+        names.forEach(function (name) {
+            var on = disabled.indexOf(name) < 0;
+            var src = sources.filter(function (s) { return s.name === name; })[0];
+            html += '<label class="src-cell' + (on ? '' : ' off') + '">'
+                + '<input type="checkbox" data-src-toggle="' + esc(name) + '"' + (on ? ' checked' : '') + '>'
+                + '<span class="nm">' + esc(name) + '</span>'
+                + (src ? '<span class="cnt">' + src.count + '</span>' : '')
+                + '</label>';
+        });
+        box.innerHTML = html;
+        box.querySelectorAll('[data-src-toggle]').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                var name = cb.getAttribute('data-src-toggle');
+                var i = disabled.indexOf(name);
+                if (cb.checked && i >= 0) disabled.splice(i, 1);
+                if (!cb.checked && i < 0) disabled.push(name);
+                renderOrder();
+                state('有未保存的更改', '');
+            });
+        });
+        $('src-hint').textContent = (names.length - disabled.length) + ' / ' + names.length + ' 个来源启用';
     }
 
     // ---------- 数据 ----------
@@ -352,13 +515,20 @@
         cfg = {
             defaults: Object.assign({}, c.defaults || {}),
             sourcesOrder: (c.sourcesOrder || []).slice(),
+            disabledSources: (c.disabledSources || []).slice(),
             lock: { mode: (c.lock && c.lock.mode) || 'soft', keys: ((c.lock && c.lock.keys) || []).slice() }
         };
         order = cfg.sourcesOrder.slice();
+        disabled = cfg.disabledSources.slice();
         renderPrefs();
         renderLockMode();
         renderOrder();
-        $('raw').value = JSON.stringify({ defaults: cfg.defaults, sourcesOrder: cfg.sourcesOrder, lock: cfg.lock }, null, 2);
+        $('raw').value = JSON.stringify({
+            defaults: cfg.defaults,
+            sourcesOrder: cfg.sourcesOrder,
+            disabledSources: cfg.disabledSources,
+            lock: cfg.lock
+        }, null, 2);
     }
 
     function loadRemote() {
@@ -368,6 +538,7 @@
             .then(function (j) {
                 if (!j || !j.ok) throw new Error((j && j.error) || '读取失败');
                 applyConfig(j.config);
+                if (!sources.length) { loadSourceNames().catch(function () {}); }
                 var t = j.config.updated_at || '尚未保存过';
                 state('已载入配置 · ' + t, 'ok');
                 if (!j.writesEnabled) {
@@ -380,9 +551,9 @@
             });
     }
 
-    function syncSources() {
-        $('order-hint').textContent = '正在读取当前报告…';
-        fetch('/index.html?ts=' + Date.now(), { cache: 'no-store' })
+    // 只读取报告里的来源清单（用于「来源启用」与条数展示），不改动顺序
+    function loadSourceNames() {
+        return fetch('/index.html?ts=' + Date.now(), { cache: 'no-store' })
             .then(function (r) { return r.text(); })
             .then(function (txt) {
                 var m = txt.match(/window\.NEWSNOW_DATA\s*=\s*(\{[\s\S]*?\});\s*<\/script>/);
@@ -393,20 +564,27 @@
                 });
                 if (!sources.length) throw new Error('报告里没有来源数据');
                 sources.sort(function (a, b) { return b.count - a.count; });
-                // 保留已有顺序，追加新来源
-                var known = {};
-                order = order.filter(function (n) {
-                    var hit = sources.some(function (s) { return s.name === n; });
-                    if (hit) known[n] = 1;
-                    return hit;
-                });
-                sources.forEach(function (s) { if (!known[s.name]) order.push(s.name); });
-                renderOrder();
-                state('已同步 ' + sources.length + ' 个来源，记得保存', '');
-            })
-            .catch(function (e) {
-                $('order-hint').textContent = '同步失败：' + e.message;
+                renderSources();
+                return sources;
             });
+    }
+
+    function syncSources() {
+        $('order-hint').textContent = '正在读取当前报告…';
+        loadSourceNames().then(function () {
+            // 保留已有顺序，追加新来源
+            var known = {};
+            order = order.filter(function (n) {
+                var hit = sources.some(function (s) { return s.name === n; });
+                if (hit) known[n] = 1;
+                return hit;
+            });
+            sources.forEach(function (s) { if (!known[s.name]) order.push(s.name); });
+            renderOrder();
+            state('已同步 ' + sources.length + ' 个来源，记得保存', '');
+        }).catch(function (e) {
+            $('order-hint').textContent = '同步失败：' + e.message;
+        });
     }
 
     function save() {
@@ -414,6 +592,7 @@
         var payload = {
             defaults: cfg.defaults,
             sourcesOrder: order,
+            disabledSources: disabled,
             lock: { mode: cfg.lock.mode, keys: cfg.lock.mode === 'hard' ? [] : cfg.lock.keys }
         };
         var btn = $('btn-save');
@@ -481,18 +660,29 @@
         state('顺序已清空（保存后按热度排序）', '');
     };
     $('btn-dump').onclick = function () {
-        $('raw').value = JSON.stringify({ defaults: cfg.defaults, sourcesOrder: order, lock: cfg.lock }, null, 2);
+        $('raw').value = JSON.stringify({ defaults: cfg.defaults, sourcesOrder: order, disabledSources: disabled, lock: cfg.lock }, null, 2);
     };
     $('btn-apply-raw').onclick = function () {
         try {
             var j = JSON.parse($('raw').value);
             applyConfig(j);
             order = (j.sourcesOrder || []).slice();
+            disabled = (j.disabledSources || []).slice();
             renderOrder();
             state('JSON 已应用，记得保存', '');
         } catch (e) {
             state('JSON 解析失败：' + e.message, 'err');
         }
+    };
+    $('btn-all-on').onclick = function () {
+        disabled = [];
+        renderOrder();
+        state('已全部启用（记得保存）', '');
+    };
+    $('btn-all-off').onclick = function () {
+        disabled = allNames();
+        renderOrder();
+        state('已全部停用（记得保存）', '');
     };
 
     if (token()) { $('token').value = token(); setConn(true); }
