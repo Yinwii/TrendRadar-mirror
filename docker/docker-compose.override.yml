@@ -21,6 +21,8 @@ services:
       - ../trendradar/report/newsnow_config.py:/app/trendradar/report/newsnow_config.py:ro
       - ../trendradar/report/newsnow_admin.html:/app/trendradar/report/newsnow_admin.html:ro
       - ../trendradar/webserver.py:/app/trendradar/webserver.py:ro
+      - ../trendradar/report/newsnow_favicon.ico:/app/trendradar/report/newsnow_favicon.ico:ro
+      - ../trendradar/report/newsnow_favicon.svg:/app/trendradar/report/newsnow_favicon.svg:ro
       # 可写状态目录：NewsNow 后台全局配置 + 管理员口令，重建容器不丢
       - ../state:/app/state
     environment:

@@ -112,6 +112,10 @@ class Handler(SimpleHTTPRequestHandler):
             })
         if path == "/admin":
             return self._send_admin()
+        if path == "/favicon.ico":
+            return self._send_file(_HERE / "report" / "newsnow_favicon.ico", "image/x-icon", cache=True)
+        if path == "/favicon.svg":
+            return self._send_file(_HERE / "report" / "newsnow_favicon.svg", "image/svg+xml", cache=True)
         return super().do_GET()
 
     def do_POST(self):  # noqa: N802
@@ -159,6 +163,19 @@ class Handler(SimpleHTTPRequestHandler):
         return self._send_json({"ok": True, "config": cfg})
 
     # ---------------- 管理页 ----------------
+
+    def _send_file(self, file_path: Path, content_type: str, cache: bool = False):
+        try:
+            body = file_path.read_bytes()
+        except Exception as e:
+            return self._send_json({"ok": False, "error": f"文件缺失: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "public, max-age=86400" if cache else "no-store")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
     def _send_admin(self):
         try:
