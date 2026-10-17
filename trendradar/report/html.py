@@ -40,6 +40,7 @@ _NEWSNOW_CSS = """
                 --nn-rank-text: #9aa3af;
                 --nn-shadow: 0 1px 3px rgba(17,24,39,0.05), 0 6px 18px rgba(17,24,39,0.04);
                 --nn-shadow-hover: 0 4px 12px rgba(17,24,39,0.09), 0 14px 34px rgba(17,24,39,0.08);
+                --nn-toolbar-bg: rgba(255,255,255,0.55);
                 --nn-colw: 350px;
                 --nn-title-size: 14px;
                 display: none; min-height: 100vh; background: var(--nn-bg);
@@ -66,6 +67,7 @@ _NEWSNOW_CSS = """
                 --nn-rank-text: #6b7488;
                 --nn-shadow: 0 1px 3px rgba(0,0,0,0.35), 0 6px 18px rgba(0,0,0,0.25);
                 --nn-shadow-hover: 0 4px 12px rgba(0,0,0,0.45), 0 14px 34px rgba(0,0,0,0.35);
+                --nn-toolbar-bg: rgba(18,21,28,0.55);
             }
             body.newsnow-mode { background: #f4f5f7; }
             body.dark-mode.newsnow-mode { background: #12151c; }
@@ -156,7 +158,51 @@ _NEWSNOW_CSS = """
             .nn-main { max-width: 2100px; margin: 0 auto; padding: 18px 24px 56px; }
             .nn-toolbar {
                 display: flex; justify-content: space-between; align-items: center;
-                gap: 12px; margin-bottom: 14px; color: var(--nn-sub); font-size: 13px; flex-wrap: wrap;
+                gap: 10px; margin-bottom: 12px; color: var(--nn-sub); font-size: 13px; flex-wrap: wrap;
+                background: var(--nn-toolbar-bg);
+                border: 1px solid var(--nn-border); border-radius: 12px;
+                padding: 8px 12px;
+                backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            }
+            .nn-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+            .nn-search {
+                height: 30px; width: 230px; max-width: 62vw; padding: 0 12px;
+                border-radius: 999px; border: 1px solid var(--nn-chip-border);
+                background: var(--nn-chip-bg); color: var(--nn-text); font-size: 13px; outline: none;
+            }
+            .nn-search:focus { border-color: #8ab4f8; }
+            .nn-search::placeholder { color: var(--nn-faint); }
+            .nn-tool-btn {
+                height: 30px; min-width: 30px; padding: 0 9px; border-radius: 999px; cursor: pointer;
+                border: 1px solid var(--nn-chip-border); background: var(--nn-chip-bg);
+                color: var(--nn-sub); font-size: 14px; line-height: 1;
+                display: inline-flex; align-items: center; justify-content: center;
+                transition: all 0.12s ease;
+            }
+            .nn-tool-btn:hover { color: var(--nn-text); border-color: #c6ccd6; }
+            .nn-hotwords { display: none; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+            .nn-hot-label { font-size: 12px; color: var(--nn-faint); flex: 0 0 auto; }
+            .nn-hot-chip {
+                display: inline-flex; align-items: center; gap: 4px;
+                padding: 3px 10px; border-radius: 999px; cursor: pointer; user-select: none;
+                border: 1px solid var(--nn-chip-border); background: var(--nn-chip-bg);
+                color: var(--nn-chip-text); font-size: 12px; transition: all 0.12s ease;
+            }
+            .nn-hot-chip:hover { border-color: #c6ccd6; }
+            .nn-hot-chip.active { background: var(--nn-chip-active-bg); border-color: var(--nn-chip-active-bg); color: var(--nn-chip-active-text); }
+
+            /* 卡片收纳 */
+            .nn-caret { margin-left: 2px; font-size: 11px; color: var(--nn-faint); display: inline-block; transition: transform 0.15s ease; }
+            .nn-card.nn-collapsed .nn-caret { transform: rotate(-90deg); }
+            .nn-card.nn-collapsed .nn-item { display: none; }
+            .nn-card-head { cursor: pointer; }
+
+            /* 顶栏圆角 / 悬浮样式 */
+            #newsnow-view.nn-head-float .nn-header {
+                top: 10px; margin: 10px auto 0; width: calc(100% - 24px);
+                border-radius: var(--nn-head-radius, 14px);
+                border: 1px solid var(--nn-border);
+                box-shadow: var(--nn-shadow);
             }
             .nn-toolbar .nn-hint { font-size: 12px; color: var(--nn-faint); }
             .nn-toolbar .nn-hint kbd {
@@ -356,10 +402,37 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             </div>
                         </div>
                         <div class="nn-set-row">
-                            <span class="nn-set-label">卡片质感</span>
-                            <div class="nn-set-opts" data-key="glass">
+                            <span class="nn-set-label">界面透明度</span>
+                            <div class="nn-set-opts" data-key="alpha">
                                 <span class="nn-set-opt" data-v="solid">实心</span>
-                                <span class="nn-set-opt" data-v="glass">毛玻璃</span>
+                                <span class="nn-set-opt" data-v="high">75%</span>
+                                <span class="nn-set-opt" data-v="mid">55%</span>
+                                <span class="nn-set-opt" data-v="low">35%</span>
+                            </div>
+                        </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">顶栏圆角</span>
+                            <div class="nn-set-opts" data-key="radius">
+                                <span class="nn-set-opt" data-v="none">直角</span>
+                                <span class="nn-set-opt" data-v="sm">小</span>
+                                <span class="nn-set-opt" data-v="md">中</span>
+                                <span class="nn-set-opt" data-v="lg">大</span>
+                            </div>
+                        </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">来源排序</span>
+                            <div class="nn-set-opts" data-key="srcSort">
+                                <span class="nn-set-opt" data-v="count">按热度</span>
+                                <span class="nn-set-opt" data-v="name">按名称</span>
+                            </div>
+                        </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">热词数量</span>
+                            <div class="nn-set-opts" data-key="hotwords">
+                                <span class="nn-set-opt" data-v="off">关</span>
+                                <span class="nn-set-opt" data-v="5">Top5</span>
+                                <span class="nn-set-opt" data-v="10">Top10</span>
+                                <span class="nn-set-opt" data-v="20">Top20</span>
                             </div>
                         </div>
                         <div class="nn-set-row">
@@ -381,8 +454,14 @@ _NEWSNOW_VIEW_TEMPLATE = """
             <div class="nn-main">
                 <div class="nn-toolbar">
                     <span id="nn-summary"></span>
-                    <span class="nn-hint">点击 <kbd>Esc</kbd> 或左上角 Logo 返回报告 · <kbd>N</kbd> 快速切换</span>
+                    <div class="nn-tools">
+                        <input id="nn-search" class="nn-search" type="text" placeholder="搜索标题关键字…" autocomplete="off">
+                        <button class="nn-tool-btn" id="nn-refresh-all" title="全局刷新（重新排序）"><span class="nn-refresh-icon">&#10227;</span></button>
+                        <button class="nn-tool-btn" id="nn-toggle-all" title="全部收起 / 展开">&#8645;</button>
+                        <span class="nn-hint"><kbd>Esc</kbd> 返回报告 · <kbd>N</kbd> 切换</span>
+                    </div>
                 </div>
+                <div class="nn-hotwords" id="nn-hotwords"></div>
                 <div class="nn-grid" id="nn-grid"></div>
             </div>
         </div>
@@ -393,10 +472,12 @@ _NEWSNOW_VIEW_TEMPLATE = """
             var NN_SELECTED = 'all';
             var NN_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#84cc16','#10b981','#0ea5e9','#a855f7'];
             var NN_PREFS_KEY = 'trendradar-nn-prefs';
-            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', glass: 'solid', scrim: 'medium' };
+            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', alpha: 'solid', radius: 'none', srcSort: 'count', hotwords: 'off', scrim: 'medium' };
             var NN_TAB = 'hot';
             var NN_FAVS = [];
             var NN_CHIPS_EXPANDED = false;
+            var NN_QUERY = '';
+            var NN_ALL_COLLAPSED = false;
 
             function nnLoadFavs() {
                 try { NN_FAVS = JSON.parse(localStorage.getItem('trendradar-nn-favs') || '[]') || []; } catch (e) { NN_FAVS = []; }
@@ -419,6 +500,25 @@ _NEWSNOW_VIEW_TEMPLATE = """
             function nnTimeMinutes(t) {
                 var m = /(\\d{1,2}):(\\d{2})/.exec(String(t || ''));
                 return m ? (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) : -1;
+            }
+            function nnComputeHotwords(data) {
+                var stop = '的了是在和我有就都不也人么说看要被把让与以及个这那吗呢吧啊上下中为对从很最又还说去时候';
+                var freq = {};
+                data.cards.forEach(function (c) {
+                    c.items.forEach(function (it) {
+                        var m = String(it.title || '').match(/[\u4e00-\u9fa5]{2,6}/g);
+                        if (!m) return;
+                        m.forEach(function (w) {
+                            for (var i = 0; i + 2 <= w.length; i++) {
+                                var bg = w.slice(i, i + 2);
+                                if (stop.indexOf(bg[0]) >= 0 || stop.indexOf(bg[1]) >= 0) continue;
+                                freq[bg] = (freq[bg] || 0) + 1;
+                            }
+                        });
+                    });
+                });
+                return Object.keys(freq).map(function (k) { return [k, freq[k]]; })
+                    .sort(function (a, b) { return b[1] - a[1]; });
             }
             function nnCardLatest(c) {
                 var best = -1;
@@ -453,7 +553,10 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             if (['normal','large'].indexOf(p.font) >= 0) NN_PREFS.font = p.font;
                             if (['white','tint','full'].indexOf(p.card) >= 0) NN_PREFS.card = p.card;
                             if (['default','gradient','bing'].indexOf(p.bg) >= 0) NN_PREFS.bg = p.bg;
-                            if (['solid','glass'].indexOf(p.glass) >= 0) NN_PREFS.glass = p.glass;
+                            if (['solid','high','mid','low'].indexOf(p.alpha) >= 0) NN_PREFS.alpha = p.alpha;
+                            if (['none','sm','md','lg'].indexOf(p.radius) >= 0) NN_PREFS.radius = p.radius;
+                            if (['count','name'].indexOf(p.srcSort) >= 0) NN_PREFS.srcSort = p.srcSort;
+                            if (['off','5','10','20'].indexOf(p.hotwords) >= 0) NN_PREFS.hotwords = p.hotwords;
                             if (['light','medium','deep'].indexOf(p.scrim) >= 0) NN_PREFS.scrim = p.scrim;
                         }
                     }
@@ -468,7 +571,27 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 v.classList.remove('force-light', 'force-dark');
                 if (NN_PREFS.theme === 'light') v.classList.add('force-light');
                 if (NN_PREFS.theme === 'dark') v.classList.add('force-dark');
-                v.classList.toggle('nn-glass', NN_PREFS.glass === 'glass');
+                var alMap = ({ solid: 1, high: 0.75, mid: 0.55, low: 0.35 });
+                var al = alMap[NN_PREFS.alpha] != null ? alMap[NN_PREFS.alpha] : 1;
+                var glassOn = al < 1;
+                v.classList.toggle('nn-glass', glassOn);
+                var darkNow = v.classList.contains('force-dark') ||
+                    (document.body.classList.contains('dark-mode') && !v.classList.contains('force-light'));
+                if (glassOn) {
+                    var cardBase = darkNow ? '27,31,42' : '255,255,255';
+                    var headBase = darkNow ? '18,21,28' : '255,255,255';
+                    v.style.setProperty('--nn-card', 'rgba(' + cardBase + ',' + al + ')');
+                    v.style.setProperty('--nn-chip-bg', 'rgba(' + cardBase + ',' + Math.max(al - 0.05, 0.3) + ')');
+                    v.style.setProperty('--nn-head-bg', 'rgba(' + headBase + ',' + Math.max(al, 0.5) + ')');
+                } else {
+                    v.style.removeProperty('--nn-card');
+                    v.style.removeProperty('--nn-chip-bg');
+                    v.style.removeProperty('--nn-head-bg');
+                }
+                var radMap = ({ none: '0px', sm: '10px', md: '18px', lg: '28px' });
+                var rad = radMap[NN_PREFS.radius] || '0px';
+                v.classList.toggle('nn-head-float', rad !== '0px');
+                v.style.setProperty('--nn-head-radius', rad);
                 var colw = ({ compact: '280px', normal: '350px', loose: '440px' })[NN_PREFS.density] || '350px';
                 v.style.setProperty('--nn-colw', colw);
                 var fs = ({ normal: '14px', large: '15.5px' })[NN_PREFS.font] || '14px';
@@ -597,6 +720,36 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         }
                     }, true);
                 }
+                // 全局刷新 / 全部收起展开 / 搜索
+                var ra = document.getElementById('nn-refresh-all');
+                if (ra && !ra.dataset.nnBound) {
+                    ra.dataset.nnBound = '1';
+                    ra.addEventListener('click', function () {
+                        var ic = ra.querySelector('.nn-refresh-icon');
+                        if (ic) { ic.classList.remove('spin'); void ic.offsetWidth; ic.classList.add('spin'); }
+                        nnRender();
+                    });
+                }
+                var ta = document.getElementById('nn-toggle-all');
+                if (ta && !ta.dataset.nnBound) {
+                    ta.dataset.nnBound = '1';
+                    ta.addEventListener('click', function () {
+                        var grid = document.getElementById('nn-grid');
+                        if (!grid) return;
+                        var anyOpen = grid.querySelector('.nn-card:not(.nn-collapsed)');
+                        NN_ALL_COLLAPSED = !!anyOpen;
+                        grid.querySelectorAll('.nn-card').forEach(function (c) { c.classList.toggle('nn-collapsed', NN_ALL_COLLAPSED); });
+                    });
+                }
+                var si = document.getElementById('nn-search');
+                if (si && !si.dataset.nnBound) {
+                    si.dataset.nnBound = '1';
+                    var tm2 = null;
+                    si.addEventListener('input', function () {
+                        clearTimeout(tm2);
+                        tm2 = setTimeout(function () { NN_QUERY = si.value || ''; nnRender(); }, 200);
+                    });
+                }
                 // 顶部主 Tab
                 var tabsEl = document.getElementById('nn-tabs');
                 if (tabsEl && !tabsEl.dataset.nnBound) {
@@ -644,7 +797,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 });
                 var reset = document.getElementById('nn-reset');
                 if (reset) reset.addEventListener('click', function () {
-                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', glass: 'solid', scrim: 'medium' };
+                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', alpha: 'solid', radius: 'none', srcSort: 'count', hotwords: 'off', scrim: 'medium' };
                     nnSavePrefs();
                     nnApplyPrefs();
                 });
@@ -668,10 +821,12 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 if (!chipsEl || !gridEl) return;
 
                 // ---- chips ----
-                var html = '<span class="nn-chip' + (NN_SELECTED === 'all' ? ' active' : '') + '" data-src="all">全部<span class="nn-chip-count">' + data.total + '</span></span>';
                 var cards = data.cards.slice().sort(function (a, b) { return b.items.length - a.items.length; });
-                for (var i = 0; i < cards.length; i++) {
-                    var c = cards[i];
+                var chipCards = cards.slice();
+                if (NN_PREFS.srcSort === 'name') chipCards.sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'zh-Hans-CN'); });
+                var html = '<span class="nn-chip' + (NN_SELECTED === 'all' ? ' active' : '') + '" data-src="all">全部<span class="nn-chip-count">' + data.total + '</span></span>';
+                for (var i = 0; i < chipCards.length; i++) {
+                    var c = chipCards[i];
                     html += '<span class="nn-chip' + (NN_SELECTED === c.name ? ' active' : '') + '" data-src="' + nnEsc(c.name) + '">'
                          +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + nnEsc(c.name)
                          +  '<span class="nn-chip-count">' + c.items.length + '</span></span>';
@@ -691,6 +846,32 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     nnRender();
                 });
 
+                // ---- 热词 ----
+                var hwEl = document.getElementById('nn-hotwords');
+                if (hwEl) {
+                    var hwN = parseInt(NN_PREFS.hotwords, 10) || 0;
+                    if (!hwN) { hwEl.style.display = 'none'; hwEl.innerHTML = ''; }
+                    else {
+                        var tops = nnComputeHotwords(data).slice(0, hwN);
+                        var hwHtml = '<span class="nn-hot-label">🔥 热词</span>';
+                        tops.forEach(function (t) {
+                            hwHtml += '<span class="nn-hot-chip' + (NN_QUERY === t[0] ? ' active' : '') + '" data-w="' + nnEsc(t[0]) + '">' + nnEsc(t[0]) + '<span class="nn-chip-count">' + t[1] + '</span></span>';
+                        });
+                        if (NN_QUERY) hwHtml += '<span class="nn-hot-chip" data-w="✕">✕ 清除筛选</span>';
+                        hwEl.innerHTML = hwHtml;
+                        hwEl.style.display = 'flex';
+                        hwEl.querySelectorAll('.nn-hot-chip').forEach(function (chip) {
+                            chip.addEventListener('click', function () {
+                                var w = chip.getAttribute('data-w');
+                                NN_QUERY = (w === '✕' || NN_QUERY === w) ? '' : w;
+                                var si2 = document.getElementById('nn-search');
+                                if (si2) si2.value = NN_QUERY;
+                                nnRender();
+                            });
+                        });
+                    }
+                }
+
                 // ---- tabs 状态 ----
                 var tabsEl = document.getElementById('nn-tabs');
                 if (tabsEl) {
@@ -704,6 +885,17 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 // ---- grid ----
                 var show = (NN_SELECTED === 'all') ? cards : cards.filter(function (c) { return c.name === NN_SELECTED; });
                 if (NN_TAB === 'fav') show = show.filter(function (c) { return nnIsFav(c.name); });
+                var q = NN_QUERY.trim().toLowerCase();
+                if (q) {
+                    var qf = [];
+                    var qTotal = 0;
+                    show.forEach(function (c) {
+                        var its = c.items.filter(function (it) { return String(it.title || '').toLowerCase().indexOf(q) >= 0; });
+                        if (its.length) { qf.push({ name: c.name, items: its }); qTotal += its.length; }
+                    });
+                    show = qf;
+                    show._qTotal = qTotal;
+                }
                 if (NN_TAB === 'live') {
                     show = show.slice().sort(function (a, b) { return nnCardLatest(b) - nnCardLatest(a); });
                 } else {
@@ -739,6 +931,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             +  '<span class="nn-card-count">' + items.length + ' 条</span>'
                             +  '<button class="nn-card-btn' + (faved ? ' faved' : '') + '" data-fav="' + nnEsc(card.name) + '" title="收藏该来源">' + (faved ? '★' : '☆') + '</button>'
                             +  '<button class="nn-card-btn" data-refresh="' + nnEsc(card.name) + '" title="刷新排序"><span class="nn-refresh-icon">&#10227;</span></button>'
+                            +  '<span class="nn-caret" title="收起 / 展开">&#9662;</span>'
                             +  '</div>';
                         items.forEach(function (it, idx) {
                             var n = idx + 1;
@@ -772,6 +965,16 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             nnRender();
                         });
                     });
+                    // 点击卡片头：收起 / 展开（刷新页面后恢复默认展开）
+                    gridEl.querySelectorAll('.nn-card-head').forEach(function (h) {
+                        h.addEventListener('click', function (e) {
+                            if (e.target.closest && e.target.closest('.nn-card-btn')) return;
+                            h.parentElement.classList.toggle('nn-collapsed');
+                        });
+                    });
+                    if (NN_ALL_COLLAPSED) {
+                        gridEl.querySelectorAll('.nn-card').forEach(function (c) { c.classList.add('nn-collapsed'); });
+                    }
                 }
 
                 // ---- 更多：全部来源目录 ----
@@ -803,7 +1006,11 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 }
 
                 if (summaryEl) {
-                    summaryEl.textContent = '共 ' + data.total + ' 条热点 · ' + show.length + ' 个来源 · 更新于 ' + (data.generated_at || '--');
+                    if (q) {
+                        summaryEl.textContent = '搜索 “' + NN_QUERY.trim() + '”：' + (show._qTotal || 0) + ' 条命中 · ' + show.length + ' 个来源';
+                    } else {
+                        summaryEl.textContent = '共 ' + data.total + ' 条热点 · ' + show.length + ' 个来源 · 更新于 ' + (data.generated_at || '--');
+                    }
                 }
             }
 
