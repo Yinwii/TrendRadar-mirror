@@ -203,6 +203,51 @@ _NEWSNOW_CSS = """
             }
             .nn-empty { text-align: center; color: var(--nn-faint); padding: 60px 0; font-size: 14px; }
 
+            /* 顶部主 Tab（最热 / 实时 / 关注 / 更多） */
+            .nn-tabs { display: flex; gap: 2px; background: var(--nn-rank-bg); padding: 3px; border-radius: 999px; flex: 0 0 auto; }
+            .nn-tab {
+                padding: 5px 14px; border-radius: 999px; font-size: 13px; line-height: 1.4;
+                color: var(--nn-sub); cursor: pointer; user-select: none; white-space: nowrap;
+                transition: all 0.15s ease;
+            }
+            .nn-tab:hover { color: var(--nn-text); }
+            .nn-tab.active { background: var(--nn-card); color: var(--nn-text); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.14); }
+            .nn-tab-badge { font-size: 10px; margin-left: 4px; opacity: 0.75; }
+
+            /* GitHub 链接 */
+            .nn-gh-btn { text-decoration: none; color: var(--nn-sub); }
+            .nn-gh-btn:hover { color: var(--nn-text); }
+
+            /* 更多：全部来源目录 */
+            .nn-more-panel {
+                display: none; position: absolute; right: 24px; top: 52px; z-index: 70;
+                width: 360px; max-width: calc(100vw - 32px); max-height: 62vh; overflow-y: auto;
+                background: var(--nn-card); border: 1px solid var(--nn-border);
+                border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.22);
+                padding: 12px 10px;
+            }
+            .nn-more-panel.open { display: block; }
+            .nn-more-panel .nn-set-title { padding: 0 8px 6px; }
+            .nn-more-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--nn-text); }
+            .nn-more-item:hover { background: var(--nn-hover); }
+            .nn-more-item .nn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, #64748b); flex: 0 0 auto; }
+            .nn-more-item .nn-count { margin-left: auto; font-size: 11px; color: var(--nn-faint); }
+            .nn-more-item .nn-card-btn { margin-left: 2px; }
+
+            /* 卡片头按钮（收藏 / 刷新） */
+            .nn-card-btn {
+                flex: 0 0 auto; width: 24px; height: 24px; margin-left: 2px; padding: 0;
+                border: none; border-radius: 6px; background: transparent;
+                color: var(--nn-faint); cursor: pointer; font-size: 13px; line-height: 1;
+                display: flex; align-items: center; justify-content: center;
+                transition: all 0.12s ease;
+            }
+            .nn-card-btn:hover { background: rgba(0,0,0,0.08); color: var(--nn-text); }
+            .nn-card-btn.faved { color: #f59e0b; }
+            .nn-refresh-icon { display: inline-block; }
+            .nn-refresh-icon.spin { animation: nn-spin 0.6s linear; }
+            @keyframes nn-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
             /* NewsNow 按钮（宽窄屏按钮左侧） */
             .newsnow-toggle-btn { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; padding: 10px 12px; }
             .newsnow-toggle-btn.active {
@@ -219,7 +264,16 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         <span class="nn-logo" onclick="toggleNewsNowMode(false)" title="返回报告视图">NewsNow</span>
                         <span class="nn-brand-sub">by TrendRadar</span>
                     </div>
+                    <div class="nn-tabs" id="nn-tabs">
+                        <span class="nn-tab active" data-tab="hot">最热</span>
+                        <span class="nn-tab" data-tab="live">实时</span>
+                        <span class="nn-tab" data-tab="fav">关注<span class="nn-tab-badge" id="nn-fav-badge"></span></span>
+                        <span class="nn-tab" data-tab="more">更多</span>
+                    </div>
                     <div class="nn-chips" id="nn-chips"></div>
+                    <a class="nn-settings-btn nn-gh-btn" href="https://github.com/Yinwii/TrendRadar-mirror" target="_blank" rel="noopener" title="GitHub · Yinwii/TrendRadar-mirror" aria-label="GitHub 仓库">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                    </a>
                     <button class="nn-settings-btn" id="nn-settings-btn" title="个性化设置">&#9881;</button>
                     <div class="nn-settings" id="nn-settings">
                         <div class="nn-set-title">个性化设置</div>
@@ -248,6 +302,10 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         </div>
                         <button class="nn-set-reset" id="nn-reset">恢复默认</button>
                     </div>
+                    <div class="nn-more-panel" id="nn-more-panel">
+                        <div class="nn-set-title">全部来源</div>
+                        <div id="nn-more-list"></div>
+                    </div>
                 </div>
             </div>
             <div class="nn-main">
@@ -265,6 +323,35 @@ _NEWSNOW_VIEW_TEMPLATE = """
             var NN_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#84cc16','#10b981','#0ea5e9','#a855f7'];
             var NN_PREFS_KEY = 'trendradar-nn-prefs';
             var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal' };
+            var NN_TAB = 'hot';
+            var NN_FAVS = [];
+
+            function nnLoadFavs() {
+                try { NN_FAVS = JSON.parse(localStorage.getItem('trendradar-nn-favs') || '[]') || []; } catch (e) { NN_FAVS = []; }
+                if (!Array.isArray(NN_FAVS)) NN_FAVS = [];
+            }
+            function nnSaveFavs() { try { localStorage.setItem('trendradar-nn-favs', JSON.stringify(NN_FAVS)); } catch (e) {} }
+            function nnIsFav(name) { return NN_FAVS.indexOf(name) >= 0; }
+            function nnToggleFav(name) {
+                var i = NN_FAVS.indexOf(name);
+                if (i >= 0) { NN_FAVS.splice(i, 1); } else { NN_FAVS.push(name); }
+                nnSaveFavs();
+                nnRender();
+            }
+            function nnTint(name) {
+                var hex = nnColor(name);
+                var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+                return 'rgba(' + r + ',' + g + ',' + b + ',0.16)';
+            }
+            function nnTimeMinutes(t) {
+                var m = /(\\d{1,2}):(\\d{2})/.exec(String(t || ''));
+                return m ? (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) : -1;
+            }
+            function nnCardLatest(c) {
+                var best = -1;
+                c.items.forEach(function (it) { var m = nnTimeMinutes(it.time); if (m > best) best = m; });
+                return best;
+            }
 
             function nnColor(name) {
                 var h = 0;
@@ -331,8 +418,60 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 if (!panel) return;
                 var willOpen = (typeof open === 'boolean') ? open : !panel.classList.contains('open');
                 panel.classList.toggle('open', willOpen);
+                if (willOpen) {
+                    var mp = document.getElementById('nn-more-panel');
+                    if (mp) mp.classList.remove('open');
+                    if (NN_TAB === 'more') { NN_TAB = 'hot'; nnSyncTabs(); }
+                }
+            }
+            function nnToggleMore(open) {
+                var panel = document.getElementById('nn-more-panel');
+                if (!panel) return;
+                var willOpen = (typeof open === 'boolean') ? open : !panel.classList.contains('open');
+                panel.classList.toggle('open', willOpen);
+                if (willOpen) {
+                    var sp = document.getElementById('nn-settings');
+                    if (sp) sp.classList.remove('open');
+                    NN_TAB = 'more';
+                } else if (NN_TAB === 'more') {
+                    NN_TAB = 'hot';
+                }
+                nnSyncTabs();
+            }
+            function nnSyncTabs() {
+                var tabsEl = document.getElementById('nn-tabs');
+                if (!tabsEl) return;
+                tabsEl.querySelectorAll('.nn-tab').forEach(function (t) {
+                    t.classList.toggle('active', t.getAttribute('data-tab') === NN_TAB);
+                });
             }
             function nnBindSettings() {
+                // 顶部主 Tab
+                var tabsEl = document.getElementById('nn-tabs');
+                if (tabsEl && !tabsEl.dataset.nnBound) {
+                    tabsEl.dataset.nnBound = '1';
+                    tabsEl.addEventListener('click', function (e) {
+                        var t = e.target.closest ? e.target.closest('.nn-tab') : null;
+                        if (!t) return;
+                        var tab = t.getAttribute('data-tab');
+                        if (tab === 'more') { nnToggleMore(); return; }
+                        NN_TAB = tab;
+                        nnToggleMore(false);
+                        nnRender();
+                    });
+                }
+                // 「更多」面板：点击面板外关闭
+                var morePanel = document.getElementById('nn-more-panel');
+                if (morePanel && !morePanel.dataset.nnBound) {
+                    morePanel.dataset.nnBound = '1';
+                    document.addEventListener('click', function (e) {
+                        if (!morePanel.classList.contains('open')) return;
+                        if (morePanel.contains(e.target)) return;
+                        var t = e.target.closest ? e.target.closest('.nn-tab') : null;
+                        if (t && t.getAttribute('data-tab') === 'more') return;
+                        nnToggleMore(false);
+                    });
+                }
                 var btn = document.getElementById('nn-settings-btn');
                 var panel = document.getElementById('nn-settings');
                 if (!btn || !panel || btn.dataset.nnBound) return;
@@ -394,24 +533,51 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     });
                 });
 
+                // ---- tabs 状态 ----
+                var tabsEl = document.getElementById('nn-tabs');
+                if (tabsEl) {
+                    tabsEl.querySelectorAll('.nn-tab').forEach(function (t) {
+                        t.classList.toggle('active', t.getAttribute('data-tab') === NN_TAB);
+                    });
+                }
+                var favBadge = document.getElementById('nn-fav-badge');
+                if (favBadge) favBadge.textContent = NN_FAVS.length ? String(NN_FAVS.length) : '';
+
                 // ---- grid ----
                 var show = (NN_SELECTED === 'all') ? cards : cards.filter(function (c) { return c.name === NN_SELECTED; });
+                if (NN_TAB === 'fav') show = show.filter(function (c) { return nnIsFav(c.name); });
+                if (NN_TAB === 'live') {
+                    show = show.slice().sort(function (a, b) { return nnCardLatest(b) - nnCardLatest(a); });
+                } else {
+                    show = show.slice().sort(function (a, b) { return b.items.length - a.items.length; });
+                }
                 gridEl.classList.toggle('nn-single', NN_SELECTED !== 'all');
 
                 if (!show.length) {
-                    gridEl.innerHTML = '<div class="nn-empty">暂无数据</div>';
+                    gridEl.innerHTML = '<div class="nn-empty">' + (NN_TAB === 'fav'
+                        ? '还没有收藏的来源：点击卡片右上角的 ☆ 收藏，即可在「关注」聚合查看'
+                        : '暂无数据') + '</div>';
                 } else {
                     var out = '';
                     show.forEach(function (card) {
-                        var items = card.items.slice().sort(function (a, b) {
-                            var ra = (a.rank == null ? 9999 : a.rank);
-                            var rb = (b.rank == null ? 9999 : b.rank);
-                            return ra - rb;
-                        });
+                        var items;
+                        if (NN_TAB === 'live') {
+                            items = card.items.slice().sort(function (a, b) { return nnTimeMinutes(b.time) - nnTimeMinutes(a.time); });
+                        } else {
+                            items = card.items.slice().sort(function (a, b) {
+                                var ra = (a.rank == null ? 9999 : a.rank);
+                                var rb = (b.rank == null ? 9999 : b.rank);
+                                return ra - rb;
+                            });
+                        }
+                        var faved = nnIsFav(card.name);
                         out += '<div class="nn-card">'
-                            +  '<div class="nn-card-head"><span class="nn-dot" style="--c:' + nnColor(card.name) + '"></span>'
+                            +  '<div class="nn-card-head nn-tinted" style="background:' + nnTint(card.name) + '"><span class="nn-dot" style="--c:' + nnColor(card.name) + '"></span>'
                             +  nnEsc(card.name)
-                            +  '<span class="nn-card-count">' + items.length + ' 条</span></div>';
+                            +  '<span class="nn-card-count">' + items.length + ' 条</span>'
+                            +  '<button class="nn-card-btn' + (faved ? ' faved' : '') + '" data-fav="' + nnEsc(card.name) + '" title="收藏该来源">' + (faved ? '★' : '☆') + '</button>'
+                            +  '<button class="nn-card-btn" data-refresh="' + nnEsc(card.name) + '" title="刷新排序"><span class="nn-refresh-icon">&#10227;</span></button>'
+                            +  '</div>';
                         items.forEach(function (it, idx) {
                             var n = idx + 1;
                             var rc = n === 1 ? ' r1' : (n === 2 ? ' r2' : (n === 3 ? ' r3' : ''));
@@ -430,6 +596,48 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         out += '</div>';
                     });
                     gridEl.innerHTML = out;
+                    gridEl.querySelectorAll('[data-fav]').forEach(function (b) {
+                        b.addEventListener('click', function (e) {
+                            e.preventDefault(); e.stopPropagation();
+                            nnToggleFav(b.getAttribute('data-fav'));
+                        });
+                    });
+                    gridEl.querySelectorAll('[data-refresh]').forEach(function (b) {
+                        b.addEventListener('click', function (e) {
+                            e.preventDefault(); e.stopPropagation();
+                            var ic = b.querySelector('.nn-refresh-icon');
+                            if (ic) { ic.classList.remove('spin'); void ic.offsetWidth; ic.classList.add('spin'); }
+                            nnRender();
+                        });
+                    });
+                }
+
+                // ---- 更多：全部来源目录 ----
+                var moreList = document.getElementById('nn-more-list');
+                if (moreList) {
+                    var mh = '';
+                    cards.forEach(function (c) {
+                        mh += '<div class="nn-more-item" data-pick="' + nnEsc(c.name) + '">'
+                            +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + nnEsc(c.name)
+                            +  '<span class="nn-count">' + c.items.length + ' 条</span>'
+                            +  '<button class="nn-card-btn' + (nnIsFav(c.name) ? ' faved' : '') + '" data-fav="' + nnEsc(c.name) + '" title="收藏该来源">' + (nnIsFav(c.name) ? '★' : '☆') + '</button>'
+                            +  '</div>';
+                    });
+                    moreList.innerHTML = mh || '<div class="nn-empty">暂无来源</div>';
+                    moreList.querySelectorAll('[data-fav]').forEach(function (b) {
+                        b.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            nnToggleFav(b.getAttribute('data-fav'));
+                        });
+                    });
+                    moreList.querySelectorAll('[data-pick]').forEach(function (row) {
+                        row.addEventListener('click', function () {
+                            NN_SELECTED = row.getAttribute('data-pick');
+                            NN_TAB = 'hot';
+                            nnToggleMore(false);
+                            nnRender();
+                        });
+                    });
                 }
 
                 if (summaryEl) {
@@ -451,6 +659,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
             // 恢复上次视图选择与个性化设置
             (function () {
                 nnLoadPrefs();
+                nnLoadFavs();
                 nnApplyPrefs();
                 nnBindSettings();
                 try {
