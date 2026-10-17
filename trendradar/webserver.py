@@ -187,7 +187,24 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def do_HEAD(self):  # noqa: N802
+        """HEAD 与 GET 走同一套路由：部分浏览器/代理会先 HEAD 探 favicon 与页面。"""
+        path = self._path()
+        if path in ("/admin", "/favicon.ico", "/favicon.svg") or path.startswith("/api/"):
+            try:
+                return self._route_get()
+            except (BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                try:
+                    self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                except Exception:
+                    pass
+                return
+        return super().do_HEAD()
 
     # ---------------- 日志 ----------------
 

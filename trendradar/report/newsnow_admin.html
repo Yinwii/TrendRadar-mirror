@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="nn-build" content="2026-10-17.3">
 <title>NewsNow 后台管理 · TrendRadar</title>
-<link rel="shortcut icon" href="/favicon.ico?v=2" sizes="32x32 16x16">
-<link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+<link rel="shortcut icon" href="/favicon.ico?v=3" sizes="32x32">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+<link rel="apple-touch-icon" href="/favicon.ico?v=3">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNGY0NmU1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjN2MzYWVkIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0idXJsKCNnKSIvPjxwb2x5bGluZSBwb2ludHM9IjYsMjIgMTMsMTQuNSAxNy41LDE5IDI2LDkiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzLjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjI2IiBjeT0iOSIgcj0iMy4yIiBmaWxsPSIjZmJiZjI0Ii8+PC9zdmc+">
 <style>
     :root {
         --bg: #f4f5f9;
@@ -205,6 +208,11 @@
     .savebar .spacer { flex: 1; }
 
     .hint { font-size: 12px; color: var(--faint); line-height: 1.7; }
+    #login-hint { font-weight: 600; }
+    #login-hint.ok { color: var(--ok-text); }
+    #login-hint.err { color: var(--err-text); }
+    @keyframes nudge { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+    .nudge { animation: nudge .28s ease-in-out; }
     .hint code {
         background: var(--panel-2); border: 1px solid var(--line);
         padding: 1px 5px; border-radius: 5px; font-size: 11.5px; color: var(--sub);
@@ -215,7 +223,7 @@
 </head>
 <body>
 <header>
-    <div class="brand"><span class="dot"></span>NewsNow 后台管理 <small>TrendRadar · 全局控制</small></div>
+    <div class="brand"><span class="dot"></span>NewsNow 后台管理 <small>TrendRadar · 全局控制 · 版本 2026-10-17.3</small></div>
     <div class="spacer"></div>
     <button class="pill" id="theme-btn" title="切换亮暗模式">🌙 深色</button>
     <span class="pill" id="conn-pill">未登录</span>
@@ -704,25 +712,50 @@
     }
 
     // ---------- 事件 ----------
+    function hint(text, cls) {
+        var el = $('login-hint');
+        el.className = 'hint' + (cls ? ' ' + cls : '');
+        el.textContent = text;
+    }
+
     $('btn-login').onclick = function () {
         var v = $('token').value.trim();
-        if (!v) { $('login-hint').textContent = '口令不能为空'; return; }
+        var btn = $('btn-login');
+        if (!v) {
+            hint('口令不能为空', 'err');
+            $('token').focus();
+            return;
+        }
+        btn.disabled = true;
+        btn.textContent = '验证中…';
+        hint('正在校验…', '');
         state('验证口令…', '');
         fetch('/api/newsnow/auth', { cache: 'no-store', headers: { 'X-NN-Token': v } })
-            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                return r.text().then(function (t) {
+                    try { return JSON.parse(t); } catch (e) { throw new Error('服务返回异常（HTTP ' + r.status + '）'); }
+                });
+            })
             .then(function (j) {
                 if (!j || !j.ok) throw new Error((j && j.error) || '验证失败');
                 if (!j.writesEnabled) throw new Error('服务端未配置 NN_ADMIN_TOKEN，暂不可写');
-                if (!j.valid) throw new Error('口令不正确');
+                if (!j.valid) throw new Error('口令不正确，请核对后重试');
                 setToken(v);
                 setConn(true);
-                $('login-hint').textContent = '口令有效';
+                hint('✓ 口令正确，已解锁', 'ok');
                 state('已解锁，可以保存', 'ok');
             })
             .catch(function (e) {
                 setConn(false);
-                $('login-hint').textContent = e.message;
+                hint('✗ ' + e.message, 'err');
                 state('未解锁：' + e.message, 'err');
+                $('token').classList.remove('nudge');
+                void $('token').offsetWidth;
+                $('token').classList.add('nudge');
+            })
+            .finally(function () {
+                btn.disabled = false;
+                btn.textContent = '验证并解锁';
             });
     };
     $('token').addEventListener('keydown', function (e) {
