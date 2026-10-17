@@ -304,7 +304,7 @@ _NEWSNOW_CSS = """
             /* 更多：全部来源目录 */
             .nn-more-panel {
                 display: none; position: absolute; right: 24px; top: 52px; z-index: 70;
-                width: 360px; max-width: calc(100vw - 32px); max-height: 62vh; overflow-y: auto;
+                width: 430px; max-width: calc(100vw - 32px); max-height: 62vh; overflow-y: auto;
                 background: var(--nn-card); border: 1px solid var(--nn-border);
                 border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.22);
                 padding: 12px 10px;
@@ -320,7 +320,8 @@ _NEWSNOW_CSS = """
                 font-size: 11px; cursor: pointer; padding: 2px 4px; border-radius: 6px;
             }
             .nn-order-reset:hover { color: var(--nn-text); background: var(--nn-hover); }
-            .nn-more-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--nn-text); }
+            .nn-more-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--nn-text); }
+            .nn-more-item .nn-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .nn-more-item:hover { background: var(--nn-hover); }
             .nn-more-item .nn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, #64748b); flex: 0 0 auto; }
             .nn-more-item .nn-count { margin-left: auto; font-size: 11px; color: var(--nn-faint); }
@@ -1247,7 +1248,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         mh += '<div class="nn-more-item" data-pick="' + nnEsc(c.name) + '" data-name="' + nnEsc(c.name) + '" draggable="' + (orderLocked ? 'false' : 'true') + '">'
                             +  '<span class="nn-drag" title="拖动调整顺序">&#8942;&#8942;</span>'
                             +  '<span class="nn-more-idx">' + (mi + 1) + '</span>'
-                            +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + nnEsc(c.name)
+                            +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + '<span class="nn-name">' + nnEsc(c.name) + '</span>'
                             +  '<span class="nn-count">' + c.items.length + ' 条</span>'
                             +  '<button class="nn-card-btn nn-move" data-totop="1" data-name="' + nnEsc(c.name) + '" title="置顶"' + ((mi === 0 || orderLocked) ? ' disabled' : '') + '>&#8689;</button>'
                             +  '<button class="nn-card-btn nn-move" data-move="-1" data-name="' + nnEsc(c.name) + '" title="上移"' + ((mi === 0 || orderLocked) ? ' disabled' : '') + '>&#9650;</button>'
