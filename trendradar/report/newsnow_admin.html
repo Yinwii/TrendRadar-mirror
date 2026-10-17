@@ -81,6 +81,7 @@
     .pill {
         display: inline-flex; align-items: center; gap: 6px;
         padding: 4px 10px; border-radius: 999px; font-size: 12px;
+        white-space: nowrap;
         border: 1px solid var(--line); color: var(--sub); background: var(--panel);
     }
     .pill.ok { color: var(--ok-text); border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08); }
@@ -145,6 +146,12 @@
     }
     .order-item:hover .order-actions, .order-item:focus-within .order-actions { display: flex; }
     @media (hover: none) { .order-item .order-actions { display: flex; } }
+    @media (max-width: 640px) {
+        header { flex-wrap: wrap; row-gap: 8px; padding: 10px 14px; gap: 8px; }
+        .brand small { display: none; }
+        .brand { font-size: 14px; }
+        header .pill { padding: 5px 9px; }
+    }
     .order-item[draggable=true] { cursor: grab; }
     .order-item.dragging { opacity: .45; }
     .order-item.drop-before { box-shadow: inset 3px 0 0 0 var(--accent-2); }
@@ -213,6 +220,10 @@
     #login-hint.err { color: var(--err-text); }
     @keyframes nudge { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
     .nudge { animation: nudge .28s ease-in-out; }
+    /* 未登录：只显示登录卡（居中窄栏），其余面板全部隐藏 */
+    body.locked .admin-only { display: none !important; }
+    body.locked main { max-width: 520px; padding-top: 9vh; }
+    main { transition: max-width .25s ease; }
     .hint code {
         background: var(--panel-2); border: 1px solid var(--line);
         padding: 1px 5px; border-radius: 5px; font-size: 11.5px; color: var(--sub);
@@ -221,7 +232,7 @@
     details summary { cursor: pointer; color: var(--sub); font-size: 12.5px; }
 </style>
 </head>
-<body>
+<body class="locked">
 <header>
     <div class="brand"><span class="dot"></span>NewsNow 后台管理 <small>TrendRadar · 全局控制 · 版本 2026-10-17.3</small></div>
     <div class="spacer"></div>
@@ -231,7 +242,7 @@
 </header>
 
 <main>
-    <div class="card">
+    <div class="card login-card">
         <h2>管理员登录</h2>
         <div class="desc">口令用于校验保存操作；只存在本浏览器 sessionStorage，不会写入页面。</div>
         <div class="login-wrap">
@@ -241,7 +252,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card admin-only">
         <h2>全局默认值</h2>
         <div class="desc">所有访客进入 NewsNow 视图时的初始样式；右侧勾选「锁定」后，访客无法自行覆盖该项。</div>
         <div id="prefs"></div>
@@ -254,7 +265,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card admin-only">
         <h2>来源顺序</h2>
         <div class="desc">
             一份顺序同时驱动<b>顶部来源按钮</b>与<b>卡片模块</b>的排列，两者始终一致。
@@ -269,7 +280,7 @@
         <div class="order-list" id="order-list"></div>
     </div>
 
-    <div class="card">
+    <div class="card admin-only">
         <h2>来源启用</h2>
         <div class="desc">
             取消勾选的来源会从页面彻底隐藏——顶部来源按钮、卡片模块、来源目录都不再出现。
@@ -283,7 +294,7 @@
         <div class="src-grid" id="src-grid"></div>
     </div>
 
-    <div class="card">
+    <div class="card admin-only">
         <h2>接口与文件</h2>
         <div class="hint">
             <div>读取：<code>GET /api/newsnow/config</code> · 保存：<code>POST /api/newsnow/config</code>（请求头 <code>X-NN-Token</code>）</div>
@@ -303,7 +314,7 @@
     </div>
 </main>
 
-<div class="savebar">
+<div class="savebar admin-only">
     <span class="state" id="save-state">就绪</span>
     <span class="spacer"></span>
     <button class="btn ghost" id="btn-reload">重新载入</button>
@@ -741,7 +752,7 @@
                 if (!j.writesEnabled) throw new Error('服务端未配置 NN_ADMIN_TOKEN，暂不可写');
                 if (!j.valid) throw new Error('口令不正确，请核对后重试');
                 setToken(v);
-                setConn(true);
+                unlock();
                 hint('✓ 口令正确，已解锁', 'ok');
                 state('已解锁，可以保存', 'ok');
             })
@@ -795,8 +806,32 @@
         state('已全部停用（记得保存）', '');
     };
 
-    if (token()) { $('token').value = token(); setConn(true); }
+    function unlock() {
+        document.body.classList.remove('locked');
+        setConn(true);
+    }
+    function lock() {
+        document.body.classList.add('locked');
+        setConn(false);
+    }
+
     loadRemote();
+    if (token()) {
+        $('token').value = token();
+        fetch('/api/newsnow/auth', { cache: 'no-store', headers: { 'X-NN-Token': token() } })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (j && j.ok && j.valid && j.writesEnabled) {
+                    unlock();
+                    hint('✓ 口令有效，已自动解锁', 'ok');
+                    state('已解锁，可以保存', 'ok');
+                } else {
+                    lock();
+                    hint('存储的口令已失效，请重新输入', 'err');
+                }
+            })
+            .catch(function () { lock(); });
+    }
 })();
 </script>
 </body>
