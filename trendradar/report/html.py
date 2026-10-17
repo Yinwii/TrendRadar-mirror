@@ -19,9 +19,54 @@ from trendradar.ai.formatter import render_ai_analysis_html_rich
 # ==================================================================
 
 _NEWSNOW_CSS = """
-            /* ===== NewsNow 视图 ===== */
-            #newsnow-view { display: none; min-height: 100vh; background: #f2f3f5; }
-            body.newsnow-mode { background: #f2f3f5; }
+            /* ===== NewsNow 视图（参考 newsnow.busiyi.world 配色）===== */
+            #newsnow-view {
+                --nn-bg: #f4f5f7;
+                --nn-card: #ffffff;
+                --nn-border: #e8eaef;
+                --nn-head-bg: rgba(255,255,255,0.88);
+                --nn-head-border: #e8eaef;
+                --nn-text: #1f2937;
+                --nn-sub: #6b7280;
+                --nn-faint: #9aa3af;
+                --nn-hover: #f6f7f9;
+                --nn-chip-bg: #ffffff;
+                --nn-chip-border: #e3e6ec;
+                --nn-chip-text: #4b5563;
+                --nn-chip-active-bg: #111827;
+                --nn-chip-active-text: #ffffff;
+                --nn-rank-bg: #f1f3f6;
+                --nn-rank-text: #9aa3af;
+                --nn-shadow: 0 1px 3px rgba(17,24,39,0.05), 0 6px 18px rgba(17,24,39,0.04);
+                --nn-shadow-hover: 0 4px 12px rgba(17,24,39,0.09), 0 14px 34px rgba(17,24,39,0.08);
+                --nn-colw: 350px;
+                --nn-title-size: 14px;
+                display: none; min-height: 100vh; background: var(--nn-bg);
+            }
+            /* 深色：跟随报告暗色模式，或用户在设置里强制深色 */
+            body.dark-mode #newsnow-view,
+            #newsnow-view.force-dark {
+                --nn-bg: #12151c;
+                --nn-card: #1b1f2a;
+                --nn-border: #262c3a;
+                --nn-head-bg: rgba(18,21,28,0.88);
+                --nn-head-border: #1f2430;
+                --nn-text: #e6e9f0;
+                --nn-sub: #9aa3b5;
+                --nn-faint: #6b7488;
+                --nn-hover: #232939;
+                --nn-chip-bg: #1b1f2a;
+                --nn-chip-border: #2b3242;
+                --nn-chip-text: #9aa3b5;
+                --nn-chip-active-bg: #8ab4f8;
+                --nn-chip-active-text: #0f172a;
+                --nn-rank-bg: #232939;
+                --nn-rank-text: #6b7488;
+                --nn-shadow: 0 1px 3px rgba(0,0,0,0.35), 0 6px 18px rgba(0,0,0,0.25);
+                --nn-shadow-hover: 0 4px 12px rgba(0,0,0,0.45), 0 14px 34px rgba(0,0,0,0.35);
+            }
+            body.newsnow-mode { background: #f4f5f7; }
+            body.dark-mode.newsnow-mode { background: #12151c; }
             body.newsnow-mode .container,
             body.newsnow-mode .reading-progress,
             body.newsnow-mode .fab-bar { display: none !important; }
@@ -29,13 +74,14 @@ _NEWSNOW_CSS = """
 
             .nn-header {
                 position: sticky; top: 0; z-index: 60;
-                background: rgba(255,255,255,0.86);
-                backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-                border-bottom: 1px solid #e5e7eb;
+                background: var(--nn-head-bg);
+                backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+                border-bottom: 1px solid var(--nn-head-border);
             }
             .nn-header-inner {
-                max-width: 1200px; margin: 0 auto; padding: 10px 16px;
-                display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+                position: relative;
+                max-width: 2100px; margin: 0 auto; padding: 12px 24px;
+                display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
             }
             .nn-brand { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
             .nn-logo {
@@ -44,72 +90,108 @@ _NEWSNOW_CSS = """
                 -webkit-background-clip: text; background-clip: text; color: transparent;
                 cursor: pointer;
             }
-            .nn-brand-sub { font-size: 12px; color: #94a3b8; font-weight: 500; }
+            .nn-brand-sub { font-size: 12px; color: var(--nn-faint); font-weight: 500; }
             .nn-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; flex: 1; scrollbar-width: none; }
             .nn-chips::-webkit-scrollbar { display: none; }
             .nn-chip {
                 flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
                 padding: 5px 12px; border-radius: 999px;
-                border: 1px solid #e5e7eb; background: #ffffff;
-                font-size: 13px; color: #475569; cursor: pointer;
+                border: 1px solid var(--nn-chip-border); background: var(--nn-chip-bg);
+                font-size: 13px; color: var(--nn-chip-text); cursor: pointer;
                 transition: all 0.15s ease; user-select: none;
             }
-            .nn-chip:hover { border-color: #cbd5e1; transform: translateY(-1px); }
-            .nn-chip.active { background: #1e293b; border-color: #1e293b; color: #ffffff; }
+            .nn-chip:hover { border-color: #c6ccd6; transform: translateY(-1px); }
+            .nn-chip.active { background: var(--nn-chip-active-bg); border-color: var(--nn-chip-active-bg); color: var(--nn-chip-active-text); }
             .nn-chip .nn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, #64748b); flex: 0 0 auto; }
             .nn-chip-count { font-size: 11px; opacity: 0.65; }
 
-            .nn-main { max-width: 1200px; margin: 0 auto; padding: 16px 16px 40px; }
+            /* 个性化设置 */
+            .nn-settings-btn {
+                flex: 0 0 auto; width: 34px; height: 34px; border-radius: 10px;
+                border: 1px solid var(--nn-chip-border); background: var(--nn-chip-bg);
+                color: var(--nn-sub); cursor: pointer; font-size: 16px; line-height: 1;
+                display: flex; align-items: center; justify-content: center;
+                transition: all 0.15s ease;
+            }
+            .nn-settings-btn:hover { border-color: #c6ccd6; transform: translateY(-1px); }
+            .nn-settings {
+                display: none; position: absolute; right: 24px; top: 52px; z-index: 70;
+                width: 320px; max-width: calc(100vw - 32px);
+                background: var(--nn-card); border: 1px solid var(--nn-border);
+                border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.22);
+                padding: 14px 16px;
+            }
+            .nn-settings.open { display: block; }
+            .nn-set-title { font-size: 13px; font-weight: 700; color: var(--nn-text); margin-bottom: 8px; }
+            .nn-set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; }
+            .nn-set-row + .nn-set-row { border-top: 1px dashed var(--nn-border); }
+            .nn-set-label { font-size: 13px; color: var(--nn-sub); flex: 0 0 auto; }
+            .nn-set-opts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+            .nn-set-opt {
+                padding: 4px 10px; border-radius: 8px; cursor: pointer; user-select: none;
+                border: 1px solid var(--nn-chip-border); background: var(--nn-chip-bg);
+                color: var(--nn-chip-text); font-size: 12px; transition: all 0.12s ease;
+            }
+            .nn-set-opt:hover { border-color: #c6ccd6; }
+            .nn-set-opt.active { background: var(--nn-chip-active-bg); border-color: var(--nn-chip-active-bg); color: var(--nn-chip-active-text); }
+            .nn-set-reset {
+                margin-top: 10px; width: 100%; padding: 7px 0; border-radius: 9px; cursor: pointer;
+                border: 1px solid var(--nn-chip-border); background: transparent;
+                color: var(--nn-sub); font-size: 12.5px;
+            }
+            .nn-set-reset:hover { color: var(--nn-text); border-color: #c6ccd6; }
+
+            /* 版面：尽量吃满宽度，列宽由 --nn-colw 控制（可在设置中调整） */
+            .nn-main { max-width: 2100px; margin: 0 auto; padding: 18px 24px 56px; }
             .nn-toolbar {
                 display: flex; justify-content: space-between; align-items: center;
-                gap: 12px; margin-bottom: 12px; color: #64748b; font-size: 13px; flex-wrap: wrap;
+                gap: 12px; margin-bottom: 14px; color: var(--nn-sub); font-size: 13px; flex-wrap: wrap;
             }
-            .nn-toolbar .nn-hint { font-size: 12px; color: #94a3b8; }
+            .nn-toolbar .nn-hint { font-size: 12px; color: var(--nn-faint); }
             .nn-toolbar .nn-hint kbd {
-                background: #e2e8f0; border-radius: 4px; padding: 1px 5px;
-                font-size: 11px; font-family: inherit; color: #475569;
+                background: var(--nn-rank-bg); border-radius: 4px; padding: 1px 5px;
+                font-size: 11px; font-family: inherit; color: var(--nn-sub);
             }
-            .nn-grid { column-count: 4; column-gap: 14px; }
-            .nn-grid.nn-single { column-count: 1; max-width: 720px; margin: 0 auto; }
-            @media (max-width: 1100px) { .nn-grid { column-count: 3; } }
-            @media (max-width: 820px)  { .nn-grid { column-count: 2; } }
-            @media (max-width: 560px)  { .nn-grid { column-count: 1; } }
+            .nn-grid { column-width: var(--nn-colw); column-gap: 16px; }
+            .nn-grid.nn-single { column-count: 1 !important; column-width: auto !important; max-width: 900px; margin: 0 auto; }
 
             .nn-card {
-                break-inside: avoid; margin-bottom: 14px;
-                background: #ffffff; border: 1px solid #eef0f2; border-radius: 14px;
-                box-shadow: 0 1px 4px rgba(0,0,0,0.05); overflow: hidden;
+                break-inside: avoid; margin-bottom: 16px;
+                background: var(--nn-card); border: 1px solid var(--nn-border); border-radius: 14px;
+                box-shadow: var(--nn-shadow); overflow: hidden;
+                transition: box-shadow 0.18s ease, transform 0.18s ease;
             }
+            .nn-card:hover { box-shadow: var(--nn-shadow-hover); transform: translateY(-2px); }
             .nn-card-head {
                 display: flex; align-items: center; gap: 8px;
-                padding: 12px 14px; border-bottom: 1px solid #f1f5f9;
-                font-weight: 600; font-size: 14px; color: #334155;
+                padding: 12px 16px; border-bottom: 1px solid var(--nn-border);
+                font-weight: 600; font-size: 14px; color: var(--nn-text);
             }
             .nn-card-head .nn-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c, #64748b); flex: 0 0 auto; }
             .nn-card-count {
                 margin-left: auto; font-size: 12px; font-weight: 500;
-                color: #94a3b8; background: #f1f5f9; padding: 1px 9px; border-radius: 999px;
+                color: var(--nn-faint); background: var(--nn-rank-bg); padding: 1px 9px; border-radius: 999px;
             }
             .nn-item {
-                display: flex; gap: 8px; padding: 9px 14px;
+                display: flex; gap: 9px; padding: 10px 16px;
                 align-items: flex-start; transition: background 0.12s ease;
             }
-            .nn-item:hover { background: #f8fafc; }
+            .nn-item:hover { background: var(--nn-hover); }
             .nn-rank {
                 flex: 0 0 22px; height: 22px; margin-top: 1px; border-radius: 6px;
                 font-size: 12px; font-weight: 700;
                 display: flex; align-items: center; justify-content: center;
-                background: #f1f5f9; color: #94a3b8;
+                background: var(--nn-rank-bg); color: var(--nn-rank-text);
             }
             .nn-rank.r1 { background: #fee2e2; color: #dc2626; }
             .nn-rank.r2 { background: #ffedd5; color: #ea580c; }
             .nn-rank.r3 { background: #fef3c7; color: #d97706; }
             .nn-title {
-                font-size: 13.5px; line-height: 1.45; color: #334155;
+                font-size: var(--nn-title-size); line-height: 1.5; color: var(--nn-text);
                 text-decoration: none; word-break: break-word;
             }
             .nn-title:hover { color: #2563eb; }
-            .nn-title:visited { color: #64748b; }
+            .nn-title:visited { color: var(--nn-faint); }
             .nn-badge-new {
                 display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px;
                 background: linear-gradient(135deg, #f43f5e, #ec4899);
@@ -117,9 +199,9 @@ _NEWSNOW_CSS = """
             }
             .nn-meta {
                 margin-left: auto; flex: 0 0 auto; padding-top: 3px;
-                font-size: 11px; color: #94a3b8; white-space: nowrap;
+                font-size: 11px; color: var(--nn-faint); white-space: nowrap;
             }
-            .nn-empty { text-align: center; color: #94a3b8; padding: 60px 0; font-size: 14px; }
+            .nn-empty { text-align: center; color: var(--nn-faint); padding: 60px 0; font-size: 14px; }
 
             /* NewsNow 按钮（宽窄屏按钮左侧） */
             .newsnow-toggle-btn { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; padding: 10px 12px; }
@@ -127,26 +209,6 @@ _NEWSNOW_CSS = """
                 background: linear-gradient(90deg, #8ab4f8, #c58af9);
                 border-color: transparent;
             }
-
-            /* NewsNow 暗色适配 */
-            body.dark-mode.newsnow-mode { background: #0f172a; }
-            body.dark-mode #newsnow-view { background: #0f172a; }
-            body.dark-mode .nn-header { background: rgba(15,23,42,0.86); border-color: #1e293b; }
-            body.dark-mode .nn-brand-sub { color: #64748b; }
-            body.dark-mode .nn-chip { background: #1e293b; border-color: #334155; color: #94a3b8; }
-            body.dark-mode .nn-chip:hover { border-color: #475569; }
-            body.dark-mode .nn-chip.active { background: #8ab4f8; border-color: #8ab4f8; color: #0f172a; }
-            body.dark-mode .nn-toolbar { color: #94a3b8; }
-            body.dark-mode .nn-toolbar .nn-hint { color: #64748b; }
-            body.dark-mode .nn-toolbar .nn-hint kbd { background: #273449; color: #94a3b8; }
-            body.dark-mode .nn-card { background: #1e293b; border-color: #273449; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
-            body.dark-mode .nn-card-head { color: #e2e8f0; border-color: #273449; }
-            body.dark-mode .nn-card-count { background: #273449; color: #94a3b8; }
-            body.dark-mode .nn-item:hover { background: #273449; }
-            body.dark-mode .nn-rank { background: #273449; color: #64748b; }
-            body.dark-mode .nn-title { color: #cbd5e1; }
-            body.dark-mode .nn-title:hover { color: #93c5fd; }
-            body.dark-mode .nn-title:visited { color: #64748b; }
 """
 
 _NEWSNOW_VIEW_TEMPLATE = """
@@ -158,6 +220,34 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         <span class="nn-brand-sub">by TrendRadar</span>
                     </div>
                     <div class="nn-chips" id="nn-chips"></div>
+                    <button class="nn-settings-btn" id="nn-settings-btn" title="个性化设置">&#9881;</button>
+                    <div class="nn-settings" id="nn-settings">
+                        <div class="nn-set-title">个性化设置</div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">主题配色</span>
+                            <div class="nn-set-opts" data-key="theme">
+                                <span class="nn-set-opt" data-v="auto">跟随报告</span>
+                                <span class="nn-set-opt" data-v="light">浅色</span>
+                                <span class="nn-set-opt" data-v="dark">深色</span>
+                            </div>
+                        </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">卡片密度</span>
+                            <div class="nn-set-opts" data-key="density">
+                                <span class="nn-set-opt" data-v="compact">紧凑</span>
+                                <span class="nn-set-opt" data-v="normal">标准</span>
+                                <span class="nn-set-opt" data-v="loose">宽松</span>
+                            </div>
+                        </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">字体大小</span>
+                            <div class="nn-set-opts" data-key="font">
+                                <span class="nn-set-opt" data-v="normal">标准</span>
+                                <span class="nn-set-opt" data-v="large">大号</span>
+                            </div>
+                        </div>
+                        <button class="nn-set-reset" id="nn-reset">恢复默认</button>
+                    </div>
                 </div>
             </div>
             <div class="nn-main">
@@ -173,6 +263,8 @@ _NEWSNOW_VIEW_TEMPLATE = """
             // ===== NewsNow 独立视图 =====
             var NN_SELECTED = 'all';
             var NN_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#84cc16','#10b981','#0ea5e9','#a855f7'];
+            var NN_PREFS_KEY = 'trendradar-nn-prefs';
+            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal' };
 
             function nnColor(name) {
                 var h = 0;
@@ -189,13 +281,93 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 return String(t).replace(/\\s*~\\s*/g, '~').replace(/[\\[\\]]/g, '');
             }
 
+            // ---- 个性化设置 ----
+            function nnLoadPrefs() {
+                try {
+                    var raw = localStorage.getItem(NN_PREFS_KEY);
+                    if (raw) {
+                        var p = JSON.parse(raw);
+                        if (p && typeof p === 'object') {
+                            if (['auto','light','dark'].indexOf(p.theme) >= 0) NN_PREFS.theme = p.theme;
+                            if (['compact','normal','loose'].indexOf(p.density) >= 0) NN_PREFS.density = p.density;
+                            if (['normal','large'].indexOf(p.font) >= 0) NN_PREFS.font = p.font;
+                        }
+                    }
+                } catch (e) {}
+            }
+            function nnSavePrefs() {
+                try { localStorage.setItem(NN_PREFS_KEY, JSON.stringify(NN_PREFS)); } catch (e) {}
+            }
+            function nnApplyPrefs() {
+                var v = document.getElementById('newsnow-view');
+                if (!v) return;
+                v.classList.remove('force-light', 'force-dark');
+                if (NN_PREFS.theme === 'light') v.classList.add('force-light');
+                if (NN_PREFS.theme === 'dark') v.classList.add('force-dark');
+                var colw = ({ compact: '280px', normal: '350px', loose: '440px' })[NN_PREFS.density] || '350px';
+                v.style.setProperty('--nn-colw', colw);
+                var fs = ({ normal: '14px', large: '15.5px' })[NN_PREFS.font] || '14px';
+                v.style.setProperty('--nn-title-size', fs);
+                nnSyncBodyBg();
+                nnSyncSettingsUi();
+            }
+            function nnSyncBodyBg() {
+                var v = document.getElementById('newsnow-view');
+                if (!document.body.classList.contains('newsnow-mode') || !v) { document.body.style.background = ''; return; }
+                document.body.style.background = getComputedStyle(v).backgroundColor;
+            }
+            function nnSyncSettingsUi() {
+                var panel = document.getElementById('nn-settings');
+                if (!panel) return;
+                panel.querySelectorAll('.nn-set-opts').forEach(function (group) {
+                    var key = group.getAttribute('data-key');
+                    group.querySelectorAll('.nn-set-opt').forEach(function (opt) {
+                        opt.classList.toggle('active', opt.getAttribute('data-v') === String(NN_PREFS[key]));
+                    });
+                });
+            }
+            function nnToggleSettings(open) {
+                var panel = document.getElementById('nn-settings');
+                if (!panel) return;
+                var willOpen = (typeof open === 'boolean') ? open : !panel.classList.contains('open');
+                panel.classList.toggle('open', willOpen);
+            }
+            function nnBindSettings() {
+                var btn = document.getElementById('nn-settings-btn');
+                var panel = document.getElementById('nn-settings');
+                if (!btn || !panel || btn.dataset.nnBound) return;
+                btn.dataset.nnBound = '1';
+                btn.addEventListener('click', function (e) { e.stopPropagation(); nnToggleSettings(); });
+                document.addEventListener('click', function (e) {
+                    if (!panel.classList.contains('open')) return;
+                    if (panel.contains(e.target) || e.target === btn) return;
+                    nnToggleSettings(false);
+                });
+                panel.querySelectorAll('.nn-set-opts').forEach(function (group) {
+                    group.addEventListener('click', function (e) {
+                        var opt = e.target.closest('.nn-set-opt');
+                        if (!opt) return;
+                        NN_PREFS[group.getAttribute('data-key')] = opt.getAttribute('data-v');
+                        nnSavePrefs();
+                        nnApplyPrefs();
+                    });
+                });
+                var reset = document.getElementById('nn-reset');
+                if (reset) reset.addEventListener('click', function () {
+                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal' };
+                    nnSavePrefs();
+                    nnApplyPrefs();
+                });
+            }
+
             function toggleNewsNowMode(force) {
                 var active = (typeof force === 'boolean') ? force : !document.body.classList.contains('newsnow-mode');
                 document.body.classList.toggle('newsnow-mode', active);
                 try { localStorage.setItem('trendradar-newsnow', active ? '1' : '0'); } catch (e) {}
                 var btn = document.getElementById('newsnow-btn');
                 if (btn) btn.classList.toggle('active', active);
-                if (active) { nnRender(); window.scrollTo(0, 0); }
+                if (active) { nnApplyPrefs(); nnRender(); window.scrollTo(0, 0); }
+                else { nnToggleSettings(false); nnSyncBodyBg(); }
             }
 
             function nnRender() {
@@ -276,8 +448,11 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 }
             });
 
-            // 恢复上次视图选择
+            // 恢复上次视图选择与个性化设置
             (function () {
+                nnLoadPrefs();
+                nnApplyPrefs();
+                nnBindSettings();
                 try {
                     if (localStorage.getItem('trendradar-newsnow') === '1') toggleNewsNowMode(true);
                 } catch (e) {}
