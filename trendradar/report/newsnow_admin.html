@@ -4,26 +4,60 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NewsNow 后台管理 · TrendRadar</title>
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNGY0NmU1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjN2MzYWVkIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0idXJsKCNnKSIvPjxwb2x5bGluZSBwb2ludHM9IjYsMjIgMTMsMTQuNSAxNy41LDE5IDI2LDkiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzLjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjI2IiBjeT0iOSIgcj0iMy4yIiBmaWxsPSIjZmJiZjI0Ii8+PC9zdmc+">
 <style>
     :root {
+        --bg: #f4f5f9;
+        --panel: #ffffff;
+        --panel-2: #eef0f6;
+        --line: #dde1ea;
+        --line-strong: #b9c0d0;
+        --text: #1d2230;
+        --sub: #55607a;
+        --faint: #8a92a6;
+        --accent: #6366f1;
+        --accent-2: #4f46e5;
+        --accent-text: #4338ca;
+        --ok: #16a34a;
+        --ok-text: #15803d;
+        --err-text: #b91c1c;
+        --warn: #d97706;
+        --danger: #dc2626;
+        --header-bg: rgba(255,255,255,.85);
+        --bar-bg: rgba(255,255,255,.92);
+        --dashed: rgba(29,34,48,.08);
+        --shadow: 0 1px 4px rgba(20,30,60,.10);
+        color-scheme: light;
+    }
+    :root[data-theme="dark"] {
         --bg: #0f1117;
         --panel: #171a23;
         --panel-2: #1d212c;
         --line: #2a2f3d;
+        --line-strong: #3a4152;
         --text: #e6e9f2;
         --sub: #9aa3b8;
         --faint: #6b7488;
         --accent: #6366f1;
         --accent-2: #818cf8;
+        --accent-text: #c7d2fe;
         --ok: #22c55e;
+        --ok-text: #86efac;
+        --err-text: #fca5a5;
         --warn: #f59e0b;
         --danger: #ef4444;
+        --header-bg: rgba(15,17,23,.88);
+        --bar-bg: rgba(15,17,23,.92);
+        --dashed: rgba(255,255,255,.06);
+        --shadow: 0 1px 4px rgba(0,0,0,.4);
+        color-scheme: dark;
     }
     * { box-sizing: border-box; }
     body {
         margin: 0; background: var(--bg); color: var(--text);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
         font-size: 14px; line-height: 1.55;
+        transition: background .18s ease, color .18s ease;
     }
     a { color: var(--accent-2); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -32,7 +66,7 @@
         position: sticky; top: 0; z-index: 10;
         display: flex; align-items: center; gap: 14px;
         padding: 14px 22px;
-        background: rgba(15,17,23,0.88);
+        background: var(--header-bg);
         backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--line);
     }
@@ -45,8 +79,9 @@
         padding: 4px 10px; border-radius: 999px; font-size: 12px;
         border: 1px solid var(--line); color: var(--sub); background: var(--panel);
     }
-    .pill.ok { color: #86efac; border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08); }
-    .pill.bad { color: #fca5a5; border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); }
+    .pill.ok { color: var(--ok-text); border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08); }
+    .pill.bad { color: var(--err-text); border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); }
+    #theme-btn { cursor: pointer; user-select: none; }
 
     main { max-width: 1080px; margin: 0 auto; padding: 22px 22px 90px; }
 
@@ -60,7 +95,7 @@
     .row {
         display: grid; grid-template-columns: 118px 1fr 88px;
         align-items: center; gap: 12px;
-        padding: 9px 0; border-top: 1px dashed rgba(255,255,255,.06);
+        padding: 9px 0; border-top: 1px dashed var(--dashed);
     }
     .row:first-of-type { border-top: none; }
     .row .label { color: var(--sub); font-size: 13px; }
@@ -70,8 +105,8 @@
         border: 1px solid var(--line); background: var(--panel-2); color: var(--sub);
         transition: all .12s ease; user-select: none;
     }
-    .opt:hover { color: var(--text); border-color: #3a4152; }
-    .opt.active { background: rgba(99,102,241,.16); border-color: rgba(99,102,241,.55); color: #c7d2fe; }
+    .opt:hover { color: var(--text); border-color: var(--line-strong); }
+    .opt.active { background: rgba(99,102,241,.16); border-color: rgba(99,102,241,.55); color: var(--accent-text); }
     .row.locked .opts { opacity: .55; pointer-events: none; }
     .lockcell { display: flex; justify-content: flex-end; }
     .lockcell label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); cursor: pointer; }
@@ -82,22 +117,34 @@
         border: none; background: var(--panel-2); color: var(--sub);
         padding: 7px 14px; font-size: 12.5px; cursor: pointer;
     }
-    .seg button.active { background: rgba(99,102,241,.2); color: #c7d2fe; }
+    .seg button.active { background: rgba(99,102,241,.2); color: var(--accent-text); }
 
-    .order-list { display: flex; flex-direction: column; gap: 4px; max-height: 420px; overflow: auto; padding-right: 4px; }
+    .order-list {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 6px; max-height: 430px; overflow: auto; padding: 2px 6px 2px 2px;
+    }
     .order-item {
-        display: flex; align-items: center; gap: 8px;
-        padding: 6px 9px; border-radius: 8px; background: var(--panel-2);
+        position: relative;
+        display: flex; align-items: center; gap: 6px; min-width: 0;
+        padding: 7px 9px; border-radius: 9px; background: var(--panel-2);
         border: 1px solid transparent;
     }
     .order-item:hover { border-color: var(--line); }
-    .order-item .idx { width: 22px; color: var(--faint); font-size: 11.5px; font-variant-numeric: tabular-nums; text-align: right; }
-    .order-item .name { flex: 1; font-size: 13px; }
-    .order-item .cnt { color: var(--faint); font-size: 11.5px; }
+    .order-item .idx { min-width: 20px; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; flex: 0 0 auto; }
+    .order-item .name { flex: 1; font-size: 12.5px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .order-item .cnt { color: var(--faint); font-size: 11px; flex: 0 0 auto; }
+    .order-actions {
+        position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+        display: none; gap: 2px; padding: 2px;
+        background: var(--panel); border: 1px solid var(--line); border-radius: 7px;
+        box-shadow: var(--shadow); z-index: 2;
+    }
+    .order-item:hover .order-actions, .order-item:focus-within .order-actions { display: flex; }
+    @media (hover: none) { .order-item .order-actions { display: flex; } }
     .order-item[draggable=true] { cursor: grab; }
     .order-item.dragging { opacity: .45; }
-    .order-item.drop-before { box-shadow: inset 0 2px 0 0 var(--accent-2); }
-    .order-item.drop-after { box-shadow: inset 0 -2px 0 0 var(--accent-2); }
+    .order-item.drop-before { box-shadow: inset 3px 0 0 0 var(--accent-2); }
+    .order-item.drop-after { box-shadow: inset -3px 0 0 0 var(--accent-2); }
     .handle { color: var(--faint); font-size: 11px; letter-spacing: -2px; user-select: none; cursor: grab; }
     .order-item.off .name { text-decoration: line-through; color: var(--faint); }
 
@@ -128,7 +175,7 @@
         border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
         padding: 8px 16px; border-radius: 9px; cursor: pointer; font-size: 13px;
     }
-    .btn:hover { border-color: #3a4152; }
+    .btn:hover { border-color: var(--line-strong); }
     .btn.primary { background: linear-gradient(135deg, var(--accent), #7c3aed); border-color: transparent; font-weight: 600; }
     .btn.primary:hover { filter: brightness(1.08); }
     .btn.ghost { background: transparent; }
@@ -148,12 +195,12 @@
         position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
         display: flex; align-items: center; gap: 12px;
         padding: 12px 22px;
-        background: rgba(15,17,23,.92); backdrop-filter: blur(12px);
+        background: var(--bar-bg); backdrop-filter: blur(12px);
         border-top: 1px solid var(--line);
     }
     .savebar .state { font-size: 12.5px; color: var(--faint); }
-    .savebar .state.ok { color: #86efac; }
-    .savebar .state.err { color: #fca5a5; }
+    .savebar .state.ok { color: var(--ok-text); }
+    .savebar .state.err { color: var(--err-text); }
     .savebar .spacer { flex: 1; }
 
     .hint { font-size: 12px; color: var(--faint); line-height: 1.7; }
@@ -169,6 +216,7 @@
 <header>
     <div class="brand"><span class="dot"></span>NewsNow 后台管理 <small>TrendRadar · 全局控制</small></div>
     <div class="spacer"></div>
+    <button class="pill" id="theme-btn" title="切换亮暗模式">🌙 深色</button>
     <span class="pill" id="conn-pill">未登录</span>
     <a class="pill" href="/" target="_blank">查看前台 ↗</a>
 </header>
@@ -288,6 +336,25 @@
         el.className = 'state' + (cls ? ' ' + cls : '');
     }
 
+    // ---------- 亮暗模式 ----------
+    var THEME_KEY = 'trendradar-nn-admin-theme';
+    function applyTheme(t) {
+        document.documentElement.setAttribute('data-theme', t);
+        var btn = $('theme-btn');
+        if (btn) btn.textContent = t === 'dark' ? '☀️ 浅色' : '🌙 深色';
+    }
+    (function initTheme() {
+        var stored = null;
+        try { stored = localStorage.getItem(THEME_KEY); } catch (e) {}
+        var sys = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        applyTheme(stored === 'dark' || stored === 'light' ? stored : sys);
+    })();
+    $('theme-btn').onclick = function () {
+        var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyTheme(cur);
+        try { localStorage.setItem(THEME_KEY, cur); } catch (e) {}
+    };
+
     // ---------- 渲染表单 ----------
     function renderPrefs() {
         var box = $('prefs');
@@ -385,16 +452,18 @@
         order.forEach(function (name, i) {
             var src = sources.filter(function (s) { return s.name === name; })[0];
             var off = disabled.indexOf(name) >= 0;
-            html += '<div class="order-item' + (off ? ' off' : '') + '" data-i="' + i + '" data-name="' + esc(name) + '" draggable="true">'
+            html += '<div class="order-item' + (off ? ' off' : '') + '" data-i="' + i + '" data-name="' + esc(name) + '" draggable="true" tabindex="0">'
                 + '<span class="handle" title="拖动调整顺序">⋮⋮</span>'
                 + '<span class="idx">' + (i + 1) + '</span>'
-                + '<span class="name">' + esc(name) + (off ? ' · 已停用' : '') + '</span>'
+                + '<span class="name" title="' + esc(name) + (off ? ' · 已停用' : '') + '">' + esc(name) + (off ? ' · 已停用' : '') + '</span>'
                 + (src ? '<span class="cnt">' + src.count + ' 条</span>' : '<span class="cnt">未在报告中</span>')
+                + '<span class="order-actions">'
                 + '<button class="mini" data-top="1" title="置顶"' + (i === 0 ? ' disabled' : '') + '>⇱</button>'
                 + '<button class="mini" data-move="-1" title="上移"' + (i === 0 ? ' disabled' : '') + '>▲</button>'
                 + '<button class="mini" data-move="1" title="下移"' + (i === order.length - 1 ? ' disabled' : '') + '>▼</button>'
                 + '<button class="mini" data-bottom="1" title="置底"' + (i === order.length - 1 ? ' disabled' : '') + '>⇲</button>'
                 + '<button class="mini" data-del="1" title="仅从顺序中移除（不影响启用）">✕</button>'
+                + '</span>'
                 + '</div>';
         });
         box.innerHTML = html;
@@ -449,7 +518,7 @@
                 if (!dragName || row.getAttribute('data-name') === dragName) return;
                 e.preventDefault();
                 var r = row.getBoundingClientRect();
-                var after = (e.clientY - r.top) > r.height / 2;
+                var after = (e.clientX - r.left) > r.width / 2;
                 row.classList.toggle('drop-before', !after);
                 row.classList.toggle('drop-after', after);
             });
@@ -460,7 +529,7 @@
                 e.preventDefault();
                 var target = row.getAttribute('data-name');
                 var r = row.getBoundingClientRect();
-                var after = (e.clientY - r.top) > r.height / 2;
+                var after = (e.clientX - r.left) > r.width / 2;
                 row.classList.remove('drop-before', 'drop-after');
                 if (!dragName || target === dragName) return;
                 var from = order.indexOf(dragName);
@@ -532,8 +601,10 @@
         }, null, 2);
     }
 
-    function loadRemote() {
-        state('读取配置中…', '');
+    function loadRemote(tries) {
+        tries = tries || 0;
+        if (!tries) state('读取配置中…', '');
+        else state('读取失败，自动重试 ' + (tries + 1) + '/3…', '');
         return fetch('/api/newsnow/config', { cache: 'no-store' })
             .then(function (r) { return r.json(); })
             .then(function (j) {
@@ -548,7 +619,11 @@
                 return j;
             })
             .catch(function (e) {
-                state('读取失败：' + e.message, 'err');
+                if (tries < 2) {
+                    setTimeout(function () { loadRemote(tries + 1); }, 900);
+                    return;
+                }
+                state('读取失败：' + e.message + '（可点「重新载入」重试）', 'err');
             });
     }
 

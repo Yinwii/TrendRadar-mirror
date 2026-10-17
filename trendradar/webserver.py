@@ -49,6 +49,7 @@ newsnow_config = _load_config_module()
 class Handler(SimpleHTTPRequestHandler):
     server_version = "TrendRadar/1.0"
     protocol_version = "HTTP/1.1"
+    timeout = 60  # 空闲 keep-alive 连接超时，避免挂死的半开连接
 
     # ---------------- 工具 ----------------
 
@@ -84,6 +85,17 @@ class Handler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True})
 
     def do_GET(self):  # noqa: N802
+        try:
+            self._route_get()
+        except (BrokenPipeError, ConnectionResetError):
+            raise
+        except Exception as e:  # 永不让连接裸断：浏览器端会表现为 JSON 截断
+            try:
+                self._send_json({"ok": False, "error": f"服务端异常: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            except Exception:
+                pass
+
+    def _route_get(self):  # noqa: N802
         path = self._path()
         if path == "/api/newsnow/config":
             cfg = newsnow_config.public_view()
@@ -103,6 +115,17 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):  # noqa: N802
+        try:
+            self._route_post()
+        except (BrokenPipeError, ConnectionResetError):
+            raise
+        except Exception as e:
+            try:
+                self._send_json({"ok": False, "error": f"服务端异常: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            except Exception:
+                pass
+
+    def _route_post(self):  # noqa: N802
         path = self._path()
         if path != "/api/newsnow/config":
             return self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
