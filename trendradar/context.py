@@ -365,6 +365,7 @@ class AppContext:
             ai_analysis=ai_analysis,
             show_new_section=self.show_new_section,
             standalone_data=standalone_data,
+            newsnow_enabled=self.config.get("NEWSNOW_ENABLED", True),
         )
 
     # === 通知内容渲染 ===

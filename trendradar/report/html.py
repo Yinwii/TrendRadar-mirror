@@ -5,12 +5,285 @@ HTML 报告渲染模块
 提供 HTML 格式的热点新闻报告生成功能
 """
 
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Callable
 
 from trendradar.report.helpers import html_escape, calculate_rank_trend
 from trendradar.utils.time import convert_time_for_display
 from trendradar.ai.formatter import render_ai_analysis_html_rich
+
+
+# ==================================================================
+# NewsNow 独立视图（参考 newsnow.busiyi.world 的卡片流呈现模式）
+# ==================================================================
+
+_NEWSNOW_CSS = """
+            /* ===== NewsNow 视图 ===== */
+            #newsnow-view { display: none; min-height: 100vh; background: #f2f3f5; }
+            body.newsnow-mode { background: #f2f3f5; }
+            body.newsnow-mode .container,
+            body.newsnow-mode .reading-progress,
+            body.newsnow-mode .fab-bar { display: none !important; }
+            body.newsnow-mode #newsnow-view { display: block; }
+
+            .nn-header {
+                position: sticky; top: 0; z-index: 60;
+                background: rgba(255,255,255,0.86);
+                backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .nn-header-inner {
+                max-width: 1200px; margin: 0 auto; padding: 10px 16px;
+                display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+            }
+            .nn-brand { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+            .nn-logo {
+                font-size: 22px; font-weight: 800; letter-spacing: -0.5px;
+                background: linear-gradient(90deg, #8ab4f8, #c58af9);
+                -webkit-background-clip: text; background-clip: text; color: transparent;
+                cursor: pointer;
+            }
+            .nn-brand-sub { font-size: 12px; color: #94a3b8; font-weight: 500; }
+            .nn-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0; flex: 1; scrollbar-width: none; }
+            .nn-chips::-webkit-scrollbar { display: none; }
+            .nn-chip {
+                flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+                padding: 5px 12px; border-radius: 999px;
+                border: 1px solid #e5e7eb; background: #ffffff;
+                font-size: 13px; color: #475569; cursor: pointer;
+                transition: all 0.15s ease; user-select: none;
+            }
+            .nn-chip:hover { border-color: #cbd5e1; transform: translateY(-1px); }
+            .nn-chip.active { background: #1e293b; border-color: #1e293b; color: #ffffff; }
+            .nn-chip .nn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, #64748b); flex: 0 0 auto; }
+            .nn-chip-count { font-size: 11px; opacity: 0.65; }
+
+            .nn-main { max-width: 1200px; margin: 0 auto; padding: 16px 16px 40px; }
+            .nn-toolbar {
+                display: flex; justify-content: space-between; align-items: center;
+                gap: 12px; margin-bottom: 12px; color: #64748b; font-size: 13px; flex-wrap: wrap;
+            }
+            .nn-toolbar .nn-hint { font-size: 12px; color: #94a3b8; }
+            .nn-toolbar .nn-hint kbd {
+                background: #e2e8f0; border-radius: 4px; padding: 1px 5px;
+                font-size: 11px; font-family: inherit; color: #475569;
+            }
+            .nn-grid { column-count: 4; column-gap: 14px; }
+            .nn-grid.nn-single { column-count: 1; max-width: 720px; margin: 0 auto; }
+            @media (max-width: 1100px) { .nn-grid { column-count: 3; } }
+            @media (max-width: 820px)  { .nn-grid { column-count: 2; } }
+            @media (max-width: 560px)  { .nn-grid { column-count: 1; } }
+
+            .nn-card {
+                break-inside: avoid; margin-bottom: 14px;
+                background: #ffffff; border: 1px solid #eef0f2; border-radius: 14px;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.05); overflow: hidden;
+            }
+            .nn-card-head {
+                display: flex; align-items: center; gap: 8px;
+                padding: 12px 14px; border-bottom: 1px solid #f1f5f9;
+                font-weight: 600; font-size: 14px; color: #334155;
+            }
+            .nn-card-head .nn-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c, #64748b); flex: 0 0 auto; }
+            .nn-card-count {
+                margin-left: auto; font-size: 12px; font-weight: 500;
+                color: #94a3b8; background: #f1f5f9; padding: 1px 9px; border-radius: 999px;
+            }
+            .nn-item {
+                display: flex; gap: 8px; padding: 9px 14px;
+                align-items: flex-start; transition: background 0.12s ease;
+            }
+            .nn-item:hover { background: #f8fafc; }
+            .nn-rank {
+                flex: 0 0 22px; height: 22px; margin-top: 1px; border-radius: 6px;
+                font-size: 12px; font-weight: 700;
+                display: flex; align-items: center; justify-content: center;
+                background: #f1f5f9; color: #94a3b8;
+            }
+            .nn-rank.r1 { background: #fee2e2; color: #dc2626; }
+            .nn-rank.r2 { background: #ffedd5; color: #ea580c; }
+            .nn-rank.r3 { background: #fef3c7; color: #d97706; }
+            .nn-title {
+                font-size: 13.5px; line-height: 1.45; color: #334155;
+                text-decoration: none; word-break: break-word;
+            }
+            .nn-title:hover { color: #2563eb; }
+            .nn-title:visited { color: #64748b; }
+            .nn-badge-new {
+                display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px;
+                background: linear-gradient(135deg, #f43f5e, #ec4899);
+                color: #fff; font-size: 10px; font-weight: 600; vertical-align: 1px;
+            }
+            .nn-meta {
+                margin-left: auto; flex: 0 0 auto; padding-top: 3px;
+                font-size: 11px; color: #94a3b8; white-space: nowrap;
+            }
+            .nn-empty { text-align: center; color: #94a3b8; padding: 60px 0; font-size: 14px; }
+
+            /* NewsNow 按钮（宽窄屏按钮左侧） */
+            .newsnow-toggle-btn { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; padding: 10px 12px; }
+            .newsnow-toggle-btn.active {
+                background: linear-gradient(90deg, #8ab4f8, #c58af9);
+                border-color: transparent;
+            }
+
+            /* NewsNow 暗色适配 */
+            body.dark-mode.newsnow-mode { background: #0f172a; }
+            body.dark-mode #newsnow-view { background: #0f172a; }
+            body.dark-mode .nn-header { background: rgba(15,23,42,0.86); border-color: #1e293b; }
+            body.dark-mode .nn-brand-sub { color: #64748b; }
+            body.dark-mode .nn-chip { background: #1e293b; border-color: #334155; color: #94a3b8; }
+            body.dark-mode .nn-chip:hover { border-color: #475569; }
+            body.dark-mode .nn-chip.active { background: #8ab4f8; border-color: #8ab4f8; color: #0f172a; }
+            body.dark-mode .nn-toolbar { color: #94a3b8; }
+            body.dark-mode .nn-toolbar .nn-hint { color: #64748b; }
+            body.dark-mode .nn-toolbar .nn-hint kbd { background: #273449; color: #94a3b8; }
+            body.dark-mode .nn-card { background: #1e293b; border-color: #273449; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+            body.dark-mode .nn-card-head { color: #e2e8f0; border-color: #273449; }
+            body.dark-mode .nn-card-count { background: #273449; color: #94a3b8; }
+            body.dark-mode .nn-item:hover { background: #273449; }
+            body.dark-mode .nn-rank { background: #273449; color: #64748b; }
+            body.dark-mode .nn-title { color: #cbd5e1; }
+            body.dark-mode .nn-title:hover { color: #93c5fd; }
+            body.dark-mode .nn-title:visited { color: #64748b; }
+"""
+
+_NEWSNOW_VIEW_TEMPLATE = """
+        <div id="newsnow-view">
+            <div class="nn-header">
+                <div class="nn-header-inner">
+                    <div class="nn-brand">
+                        <span class="nn-logo" onclick="toggleNewsNowMode(false)" title="返回报告视图">NewsNow</span>
+                        <span class="nn-brand-sub">by TrendRadar</span>
+                    </div>
+                    <div class="nn-chips" id="nn-chips"></div>
+                </div>
+            </div>
+            <div class="nn-main">
+                <div class="nn-toolbar">
+                    <span id="nn-summary"></span>
+                    <span class="nn-hint">点击 <kbd>Esc</kbd> 或左上角 Logo 返回报告 · <kbd>N</kbd> 快速切换</span>
+                </div>
+                <div class="nn-grid" id="nn-grid"></div>
+            </div>
+        </div>
+        <script>window.NEWSNOW_DATA = __NEWSNOW_DATA__;</script>
+        <script>
+            // ===== NewsNow 独立视图 =====
+            var NN_SELECTED = 'all';
+            var NN_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#84cc16','#10b981','#0ea5e9','#a855f7'];
+
+            function nnColor(name) {
+                var h = 0;
+                for (var i = 0; i < name.length; i++) { h = (h * 31 + name.charCodeAt(i)) >>> 0; }
+                return NN_COLORS[h % NN_COLORS.length];
+            }
+            function nnEsc(s) {
+                return String(s == null ? '' : s)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            }
+            function nnSimplifyTime(t) {
+                if (!t) return '';
+                return String(t).replace(/\\s*~\\s*/g, '~').replace(/[\\[\\]]/g, '');
+            }
+
+            function toggleNewsNowMode(force) {
+                var active = (typeof force === 'boolean') ? force : !document.body.classList.contains('newsnow-mode');
+                document.body.classList.toggle('newsnow-mode', active);
+                try { localStorage.setItem('trendradar-newsnow', active ? '1' : '0'); } catch (e) {}
+                var btn = document.getElementById('newsnow-btn');
+                if (btn) btn.classList.toggle('active', active);
+                if (active) { nnRender(); window.scrollTo(0, 0); }
+            }
+
+            function nnRender() {
+                var data = window.NEWSNOW_DATA || { generated_at: '', total: 0, cards: [] };
+                var chipsEl = document.getElementById('nn-chips');
+                var gridEl = document.getElementById('nn-grid');
+                var summaryEl = document.getElementById('nn-summary');
+                if (!chipsEl || !gridEl) return;
+
+                // ---- chips ----
+                var html = '<span class="nn-chip' + (NN_SELECTED === 'all' ? ' active' : '') + '" data-src="all">全部<span class="nn-chip-count">' + data.total + '</span></span>';
+                var cards = data.cards.slice().sort(function (a, b) { return b.items.length - a.items.length; });
+                for (var i = 0; i < cards.length; i++) {
+                    var c = cards[i];
+                    html += '<span class="nn-chip' + (NN_SELECTED === c.name ? ' active' : '') + '" data-src="' + nnEsc(c.name) + '">'
+                         +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + nnEsc(c.name)
+                         +  '<span class="nn-chip-count">' + c.items.length + '</span></span>';
+                }
+                chipsEl.innerHTML = html;
+                chipsEl.querySelectorAll('.nn-chip').forEach(function (chip) {
+                    chip.addEventListener('click', function () {
+                        NN_SELECTED = chip.getAttribute('data-src');
+                        nnRender();
+                    });
+                });
+
+                // ---- grid ----
+                var show = (NN_SELECTED === 'all') ? cards : cards.filter(function (c) { return c.name === NN_SELECTED; });
+                gridEl.classList.toggle('nn-single', NN_SELECTED !== 'all');
+
+                if (!show.length) {
+                    gridEl.innerHTML = '<div class="nn-empty">暂无数据</div>';
+                } else {
+                    var out = '';
+                    show.forEach(function (card) {
+                        var items = card.items.slice().sort(function (a, b) {
+                            var ra = (a.rank == null ? 9999 : a.rank);
+                            var rb = (b.rank == null ? 9999 : b.rank);
+                            return ra - rb;
+                        });
+                        out += '<div class="nn-card">'
+                            +  '<div class="nn-card-head"><span class="nn-dot" style="--c:' + nnColor(card.name) + '"></span>'
+                            +  nnEsc(card.name)
+                            +  '<span class="nn-card-count">' + items.length + ' 条</span></div>';
+                        items.forEach(function (it, idx) {
+                            var n = idx + 1;
+                            var rc = n === 1 ? ' r1' : (n === 2 ? ' r2' : (n === 3 ? ' r3' : ''));
+                            var meta = [];
+                            if (it.rank != null) meta.push('第 ' + it.rank + ' 位');
+                            var t = nnSimplifyTime(it.time);
+                            if (t) meta.push(t);
+                            var href = it.url ? ' href="' + nnEsc(it.url) + '" target="_blank" rel="noopener"' : '';
+                            out += '<div class="nn-item">'
+                                +  '<span class="nn-rank' + rc + '">' + n + '</span>'
+                                +  '<a class="nn-title"' + href + ' title="' + nnEsc(it.keyword || '') + '">' + nnEsc(it.title)
+                                +  (it.new ? '<span class="nn-badge-new">NEW</span>' : '') + '</a>'
+                                +  (meta.length ? '<span class="nn-meta">' + nnEsc(meta.join(' · ')) + '</span>' : '')
+                                +  '</div>';
+                        });
+                        out += '</div>';
+                    });
+                    gridEl.innerHTML = out;
+                }
+
+                if (summaryEl) {
+                    summaryEl.textContent = '共 ' + data.total + ' 条热点 · ' + show.length + ' 个来源 · 更新于 ' + (data.generated_at || '--');
+                }
+            }
+
+            // Esc 返回报告视图，N 快速切换
+            document.addEventListener('keydown', function (e) {
+                var tag = (e.target && e.target.tagName || '').toLowerCase();
+                if (tag === 'input' || tag === 'textarea') return;
+                if (e.key === 'Escape' || e.keyCode === 27) {
+                    if (document.body.classList.contains('newsnow-mode')) toggleNewsNowMode(false);
+                } else if (e.key === 'n' || e.key === 'N') {
+                    toggleNewsNowMode();
+                }
+            });
+
+            // 恢复上次视图选择
+            (function () {
+                try {
+                    if (localStorage.getItem('trendradar-newsnow') === '1') toggleNewsNowMode(true);
+                } catch (e) {}
+            })();
+        </script>
+"""
 
 
 def render_html_content(
@@ -27,6 +300,7 @@ def render_html_content(
     standalone_data: Optional[Dict] = None,
     ai_analysis: Optional[Any] = None,
     show_new_section: bool = True,
+    newsnow_enabled: bool = True,
 ) -> str:
     """渲染HTML内容
 
@@ -43,6 +317,7 @@ def render_html_content(
         standalone_data: 独立展示区数据（可选），包含 platforms 和 rss_feeds
         ai_analysis: AI 分析结果对象（可选），AIAnalysisResult 实例
         show_new_section: 是否显示新增热点区域
+        newsnow_enabled: 是否启用 NewsNow 独立视图（工具栏按钮 + 卡片流页面）
 
     Returns:
         渲染后的 HTML 字符串
@@ -1521,6 +1796,7 @@ def render_html_content(
             body.dark-mode .badge-new {
                 background: linear-gradient(135deg, #be185d, #9333ea);
             }
+__NEWSNOW_CSS__
         </style>
     </head>
     <body>
@@ -1529,6 +1805,7 @@ def render_html_content(
             <div class="header">
                 <div class="header-watermark">TrendRadar</div>
                 <div class="save-buttons">
+                    __NEWSNOW_BUTTON__
                     <button class="toggle-wide-btn" onclick="toggleWideMode()" title="切换宽屏/窄屏">⛶</button>
                     <button class="toggle-dark-btn" onclick="toggleDarkMode()" title="切换暗色/亮色">☽</button>
                     <div class="save-btn-group">
@@ -2331,6 +2608,7 @@ def render_html_content(
                 </div>
             </div>
         </div>
+__NEWSNOW_VIEW__
 
         <div class="fab-bar">
             <button class="fab-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="返回顶部">↑</button>
@@ -3402,5 +3680,43 @@ def render_html_content(
     </body>
     </html>
     """
+
+    # ===== NewsNow 独立视图（参考 newsnow.busiyi.world，按开关注入）=====
+    if newsnow_enabled:
+        # 按来源（平台）聚合所有命中新闻，供卡片流展示
+        newsnow_cards: Dict[str, List[Dict]] = {}
+        for stat in report_data.get("stats", []):
+            for t in stat.get("titles", []):
+                src = t.get("source_name") or "未知来源"
+                ranks = t.get("ranks") or []
+                newsnow_cards.setdefault(src, []).append({
+                    "title": t.get("title", ""),
+                    "url": t.get("mobile_url") or t.get("url", ""),
+                    "rank": min(ranks) if ranks else None,
+                    "time": t.get("time_display", ""),
+                    "new": bool(t.get("is_new", False)),
+                    "keyword": stat.get("word", ""),
+                })
+        newsnow_data = {
+            "generated_at": now.strftime("%m-%d %H:%M"),
+            "total": sum(len(v) for v in newsnow_cards.values()),
+            "cards": [{"name": k, "items": v} for k, v in newsnow_cards.items()],
+        }
+        newsnow_json = json.dumps(newsnow_data, ensure_ascii=False).replace("</", "<\\/")
+
+        button_html = (
+            '<button id="newsnow-btn" class="toggle-wide-btn newsnow-toggle-btn" '
+            'onclick="toggleNewsNowMode()" title="NewsNow 视图">N</button>'
+        )
+        html = html.replace("__NEWSNOW_BUTTON__", button_html)
+        html = html.replace("__NEWSNOW_CSS__", _NEWSNOW_CSS)
+        html = html.replace("__NEWSNOW_VIEW__", _NEWSNOW_VIEW_TEMPLATE)
+        html = html.replace("__NEWSNOW_DATA__", newsnow_json)
+
+    # 兜底：未启用（或占位符残留）时清空
+    html = html.replace("__NEWSNOW_BUTTON__", "")
+    html = html.replace("__NEWSNOW_CSS__", "")
+    html = html.replace("__NEWSNOW_VIEW__", "")
+    html = html.replace("__NEWSNOW_DATA__", "null")
 
     return html

@@ -185,6 +185,10 @@ report:
 
   max_news_per_keyword: 0             # 每个关键词/标签最大显示数量（0=不限制，仅影响展示裁剪）
 
+  newsnow_enabled: true               # 是否启用 NewsNow 独立视图（参考 newsnow.busiyi.world 的卡片流页面）
+                                      # true = 网页报告工具栏（宽/窄屏按钮左侧）显示 N 按钮，点击切换 NewsNow 卡片流
+                                      # false = 完全隐藏该按钮与页面（可用环境变量 NEWSNOW_ENABLED 覆盖）
+
 
 # ===============================================================
 # 4.5 筛选策略
