@@ -285,11 +285,27 @@ _NEWSNOW_CSS = """
             }
             .nn-more-panel.open { display: block; }
             .nn-more-panel .nn-set-title { padding: 0 8px 6px; }
+            .nn-more-head { display: flex; align-items: center; gap: 6px; padding: 0 8px 6px; }
+            .nn-more-head .nn-set-title { padding: 0; margin: 0; }
+            .nn-more-hint { margin-left: auto; font-size: 11px; color: var(--nn-faint); }
+            .nn-more-hint b { color: var(--nn-sub); font-weight: 600; }
+            .nn-order-reset {
+                border: none; background: transparent; color: var(--nn-faint);
+                font-size: 11px; cursor: pointer; padding: 2px 4px; border-radius: 6px;
+            }
+            .nn-order-reset:hover { color: var(--nn-text); background: var(--nn-hover); }
             .nn-more-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--nn-text); }
             .nn-more-item:hover { background: var(--nn-hover); }
             .nn-more-item .nn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, #64748b); flex: 0 0 auto; }
             .nn-more-item .nn-count { margin-left: auto; font-size: 11px; color: var(--nn-faint); }
             .nn-more-item .nn-card-btn { margin-left: 2px; }
+            .nn-more-item .nn-move {
+                width: 20px; height: 20px; margin-left: 0; font-size: 11px;
+                border: 1px solid transparent; border-radius: 5px;
+            }
+            .nn-more-item .nn-move:hover { border-color: var(--nn-border); color: var(--nn-text); background: var(--nn-card); }
+            .nn-more-item .nn-move[disabled] { opacity: 0.25; cursor: default; }
+            .nn-more-idx { min-width: 18px; text-align: right; font-size: 11px; color: var(--nn-faint); font-variant-numeric: tabular-nums; }
 
             /* 卡片头按钮（收藏 / 刷新） */
             .nn-card-btn {
@@ -424,6 +440,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             <div class="nn-set-opts" data-key="srcSort">
                                 <span class="nn-set-opt" data-v="count">按热度</span>
                                 <span class="nn-set-opt" data-v="name">按名称</span>
+                                <span class="nn-set-opt" data-v="custom">自定义</span>
                             </div>
                         </div>
                         <div class="nn-set-row">
@@ -446,7 +463,11 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         <button class="nn-set-reset" id="nn-reset">恢复默认</button>
                     </div>
                     <div class="nn-more-panel" id="nn-more-panel">
-                        <div class="nn-set-title">全部来源</div>
+                        <div class="nn-more-head">
+                            <span class="nn-set-title">全部来源</span>
+                            <span class="nn-more-hint">用 <b>↑ ↓</b> 调整顺序</span>
+                            <button class="nn-order-reset" id="nn-order-reset" title="清除自定义顺序，恢复按热度排序">恢复默认</button>
+                        </div>
                         <div id="nn-more-list"></div>
                     </div>
                 </div>
@@ -478,6 +499,44 @@ _NEWSNOW_VIEW_TEMPLATE = """
             var NN_CHIPS_EXPANDED = false;
             var NN_QUERY = '';
             var NN_ALL_COLLAPSED = false;
+            var NN_SRC_ORDER = [];
+            var NN_SRC_ORDER_KEY = 'trendradar-nn-srcorder';
+
+            function nnLoadOrder() {
+                try { NN_SRC_ORDER = JSON.parse(localStorage.getItem(NN_SRC_ORDER_KEY) || '[]') || []; } catch (e) { NN_SRC_ORDER = []; }
+                if (!Array.isArray(NN_SRC_ORDER)) NN_SRC_ORDER = [];
+            }
+            function nnSaveOrder() {
+                try { localStorage.setItem(NN_SRC_ORDER_KEY, JSON.stringify(NN_SRC_ORDER)); } catch (e) {}
+            }
+            function nnApplyCustomOrder(list) {
+                if (!NN_SRC_ORDER.length) return list.slice();
+                var idx = {};
+                NN_SRC_ORDER.forEach(function (n, i) { idx[n] = i; });
+                return list.slice().sort(function (a, b) {
+                    var ia = (idx[a.name] == null) ? 9999 : idx[a.name];
+                    var ib = (idx[b.name] == null) ? 9999 : idx[b.name];
+                    if (ia === ib) return b.items.length - a.items.length;
+                    return ia - ib;
+                });
+            }
+            function nnMoveSource(name, dir) {
+                // 首次手动排序：以当前展示顺序为基准
+                if (!NN_SRC_ORDER.length) {
+                    NN_SRC_ORDER = window.__nnLastOrder ? window.__nnLastOrder.slice() : [];
+                }
+                var i = NN_SRC_ORDER.indexOf(name);
+                if (i < 0) { NN_SRC_ORDER.push(name); i = NN_SRC_ORDER.length - 1; }
+                var j = i + dir;
+                if (j < 0 || j >= NN_SRC_ORDER.length) return;
+                var tmp = NN_SRC_ORDER[i];
+                NN_SRC_ORDER[i] = NN_SRC_ORDER[j];
+                NN_SRC_ORDER[j] = tmp;
+                NN_PREFS.srcSort = 'custom';
+                nnSaveOrder();
+                nnSavePrefs();
+                nnRender();
+            }
 
             function nnLoadFavs() {
                 try { NN_FAVS = JSON.parse(localStorage.getItem('trendradar-nn-favs') || '[]') || []; } catch (e) { NN_FAVS = []; }
@@ -555,7 +614,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             if (['default','gradient','bing'].indexOf(p.bg) >= 0) NN_PREFS.bg = p.bg;
                             if (['solid','high','mid','low'].indexOf(p.alpha) >= 0) NN_PREFS.alpha = p.alpha;
                             if (['none','sm','md','lg'].indexOf(p.radius) >= 0) NN_PREFS.radius = p.radius;
-                            if (['count','name'].indexOf(p.srcSort) >= 0) NN_PREFS.srcSort = p.srcSort;
+                            if (['count','name','custom'].indexOf(p.srcSort) >= 0) NN_PREFS.srcSort = p.srcSort;
                             if (['off','5','10','20'].indexOf(p.hotwords) >= 0) NN_PREFS.hotwords = p.hotwords;
                             if (['light','medium','deep'].indexOf(p.scrim) >= 0) NN_PREFS.scrim = p.scrim;
                         }
@@ -598,6 +657,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 v.style.setProperty('--nn-title-size', fs);
                 nnApplySurface();
                 nnSyncSettingsUi();
+                if (document.body.classList.contains('newsnow-mode')) nnRender();
             }
             function nnApplySurface() {
                 var v = document.getElementById('newsnow-view');
@@ -801,6 +861,14 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     nnSavePrefs();
                     nnApplyPrefs();
                 });
+                var orderReset = document.getElementById('nn-order-reset');
+                if (orderReset) orderReset.addEventListener('click', function () {
+                    NN_SRC_ORDER = [];
+                    try { localStorage.removeItem(NN_SRC_ORDER_KEY); } catch (e) {}
+                    NN_PREFS.srcSort = 'count';
+                    nnSavePrefs();
+                    nnApplyPrefs();
+                });
             }
 
             function toggleNewsNowMode(force) {
@@ -809,7 +877,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 try { localStorage.setItem('trendradar-newsnow', active ? '1' : '0'); } catch (e) {}
                 var btn = document.getElementById('newsnow-btn');
                 if (btn) btn.classList.toggle('active', active);
-                if (active) { nnApplyPrefs(); nnRender(); window.scrollTo(0, 0); }
+                if (active) { nnApplyPrefs(); window.scrollTo(0, 0); }
                 else { nnToggleSettings(false); nnApplySurface(); }
             }
 
@@ -822,8 +890,10 @@ _NEWSNOW_VIEW_TEMPLATE = """
 
                 // ---- chips ----
                 var cards = data.cards.slice().sort(function (a, b) { return b.items.length - a.items.length; });
+                if (NN_PREFS.srcSort === 'custom') cards = nnApplyCustomOrder(cards);
                 var chipCards = cards.slice();
                 if (NN_PREFS.srcSort === 'name') chipCards.sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'zh-Hans-CN'); });
+                window.__nnLastOrder = chipCards.map(function (c) { return c.name; });
                 var html = '<span class="nn-chip' + (NN_SELECTED === 'all' ? ' active' : '') + '" data-src="all">全部<span class="nn-chip-count">' + data.total + '</span></span>';
                 for (var i = 0; i < chipCards.length; i++) {
                     var c = chipCards[i];
@@ -899,7 +969,9 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 if (NN_TAB === 'live') {
                     show = show.slice().sort(function (a, b) { return nnCardLatest(b) - nnCardLatest(a); });
                 } else {
-                    show = show.slice().sort(function (a, b) { return b.items.length - a.items.length; });
+                    show = (NN_PREFS.srcSort === 'custom')
+                        ? show.slice()
+                        : show.slice().sort(function (a, b) { return b.items.length - a.items.length; });
                 }
                 gridEl.classList.toggle('nn-single', NN_SELECTED !== 'all');
 
@@ -981,10 +1053,14 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 var moreList = document.getElementById('nn-more-list');
                 if (moreList) {
                     var mh = '';
-                    cards.forEach(function (c) {
+                    var listOrder = nnApplyCustomOrder(cards);
+                    listOrder.forEach(function (c, mi) {
                         mh += '<div class="nn-more-item" data-pick="' + nnEsc(c.name) + '">'
+                            +  '<span class="nn-more-idx">' + (mi + 1) + '</span>'
                             +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + nnEsc(c.name)
                             +  '<span class="nn-count">' + c.items.length + ' 条</span>'
+                            +  '<button class="nn-card-btn nn-move" data-move="-1" data-name="' + nnEsc(c.name) + '" title="上移"' + (mi === 0 ? ' disabled' : '') + '>&#9650;</button>'
+                            +  '<button class="nn-card-btn nn-move" data-move="1" data-name="' + nnEsc(c.name) + '" title="下移"' + (mi === listOrder.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
                             +  '<button class="nn-card-btn' + (nnIsFav(c.name) ? ' faved' : '') + '" data-fav="' + nnEsc(c.name) + '" title="收藏该来源">' + (nnIsFav(c.name) ? '★' : '☆') + '</button>'
                             +  '</div>';
                     });
@@ -993,6 +1069,14 @@ _NEWSNOW_VIEW_TEMPLATE = """
                         b.addEventListener('click', function (e) {
                             e.stopPropagation();
                             nnToggleFav(b.getAttribute('data-fav'));
+                        });
+                    });
+                    moreList.querySelectorAll('[data-move]').forEach(function (b) {
+                        b.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            if (b.disabled) return;
+                            nnMoveSource(b.getAttribute('data-name'), parseInt(b.getAttribute('data-move'), 10) || 0);
                         });
                     });
                     moreList.querySelectorAll('[data-pick]').forEach(function (row) {
@@ -1029,6 +1113,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
             (function () {
                 nnLoadPrefs();
                 nnLoadFavs();
+                nnLoadOrder();
                 nnApplyPrefs();
                 nnBindSettings();
                 try {
