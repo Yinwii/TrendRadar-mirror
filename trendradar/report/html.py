@@ -104,6 +104,15 @@ _NEWSNOW_CSS = """
             .nn-chip.active { background: var(--nn-chip-active-bg); border-color: var(--nn-chip-active-bg); color: var(--nn-chip-active-text); }
             .nn-chip .nn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, #64748b); flex: 0 0 auto; }
             .nn-chip-count { font-size: 11px; opacity: 0.65; }
+            .nn-chips.expanded { flex-wrap: wrap; overflow-x: visible; }
+            .nn-chip-expand {
+                flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;
+                padding: 5px 12px; border-radius: 999px;
+                border: 1px dashed var(--nn-chip-border); background: transparent;
+                font-size: 12.5px; color: var(--nn-sub); cursor: pointer; user-select: none;
+                transition: all 0.15s ease;
+            }
+            .nn-chip-expand:hover { border-color: #c6ccd6; color: var(--nn-text); }
 
             /* 个性化设置 */
             .nn-settings-btn {
@@ -325,6 +334,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
             var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal' };
             var NN_TAB = 'hot';
             var NN_FAVS = [];
+            var NN_CHIPS_EXPANDED = false;
 
             function nnLoadFavs() {
                 try { NN_FAVS = JSON.parse(localStorage.getItem('trendradar-nn-favs') || '[]') || []; } catch (e) { NN_FAVS = []; }
@@ -446,6 +456,18 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 });
             }
             function nnBindSettings() {
+                // 来源条：鼠标滚轮横向滚动
+                var chipsElWheel = document.getElementById('nn-chips');
+                if (chipsElWheel && !chipsElWheel.dataset.nnWheel) {
+                    chipsElWheel.dataset.nnWheel = '1';
+                    chipsElWheel.addEventListener('wheel', function (e) {
+                        if (NN_CHIPS_EXPANDED) return;
+                        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                            e.preventDefault();
+                            chipsElWheel.scrollLeft += e.deltaY;
+                        }
+                    }, { passive: false });
+                }
                 // 顶部主 Tab
                 var tabsEl = document.getElementById('nn-tabs');
                 if (tabsEl && !tabsEl.dataset.nnBound) {
@@ -525,12 +547,19 @@ _NEWSNOW_VIEW_TEMPLATE = """
                          +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + nnEsc(c.name)
                          +  '<span class="nn-chip-count">' + c.items.length + '</span></span>';
                 }
+                html += '<span class="nn-chip-expand" id="nn-chip-expand">' + (NN_CHIPS_EXPANDED ? '收起 ▴' : '更多 ' + cards.length + ' 个来源 ▾') + '</span>';
                 chipsEl.innerHTML = html;
+                chipsEl.classList.toggle('expanded', NN_CHIPS_EXPANDED);
                 chipsEl.querySelectorAll('.nn-chip').forEach(function (chip) {
                     chip.addEventListener('click', function () {
                         NN_SELECTED = chip.getAttribute('data-src');
                         nnRender();
                     });
+                });
+                var expandChip = document.getElementById('nn-chip-expand');
+                if (expandChip) expandChip.addEventListener('click', function () {
+                    NN_CHIPS_EXPANDED = !NN_CHIPS_EXPANDED;
+                    nnRender();
                 });
 
                 // ---- tabs 状态 ----
