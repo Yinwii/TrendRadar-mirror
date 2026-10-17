@@ -26,3 +26,6 @@ venv/
 # ---- 系统 ----
 .DS_Store
 Thumbs.db
+
+# NewsNow 后台状态（全局配置 / 管理员口令）
+state/

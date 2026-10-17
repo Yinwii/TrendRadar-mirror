@@ -136,6 +136,15 @@ _NEWSNOW_CSS = """
             }
             .nn-settings.open { display: block; }
             .nn-set-title { font-size: 13px; font-weight: 700; color: var(--nn-text); margin-bottom: 8px; }
+            .nn-set-note {
+                margin-bottom: 8px; padding: 7px 9px; border-radius: 9px; font-size: 11.5px; line-height: 1.5;
+                color: var(--nn-sub); background: var(--nn-item-hover); border: 1px dashed var(--nn-border);
+            }
+            .nn-set-note b { color: var(--nn-text); font-weight: 600; }
+            .nn-set-row.nn-locked .nn-set-opts { opacity: 0.55; pointer-events: none; }
+            .nn-set-row.nn-locked .nn-set-label::after {
+                content: "🔒"; font-size: 10px; margin-left: 4px; opacity: 0.75;
+            }
             .nn-set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; }
             .nn-set-row + .nn-set-row { border-top: 1px dashed var(--nn-border); }
             .nn-set-label { font-size: 13px; color: var(--nn-sub); flex: 0 0 auto; }
@@ -378,6 +387,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     <button class="nn-settings-btn" id="nn-settings-btn" title="个性化设置">&#9881;</button>
                     <div class="nn-settings" id="nn-settings">
                         <div class="nn-set-title">个性化设置</div>
+                        <div class="nn-set-note" id="nn-set-note" style="display:none"></div>
                         <div class="nn-set-row">
                             <span class="nn-set-label">主题配色</span>
                             <div class="nn-set-opts" data-key="theme">
@@ -465,7 +475,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     <div class="nn-more-panel" id="nn-more-panel">
                         <div class="nn-more-head">
                             <span class="nn-set-title">全部来源</span>
-                            <span class="nn-more-hint">用 <b>↑ ↓</b> 调整顺序</span>
+                            <span class="nn-more-hint" id="nn-more-hint">用 <b>↑ ↓</b> 调整顺序</span>
                             <button class="nn-order-reset" id="nn-order-reset" title="清除自定义顺序，恢复按热度排序">恢复默认</button>
                         </div>
                         <div id="nn-more-list"></div>
@@ -488,6 +498,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
         </div>
         <script>window.NEWSNOW_DATA = __NEWSNOW_DATA__;</script>
         <script>window.NN_BING_URL = "__NN_BING_URL__";</script>
+        <script>window.NN_GLOBAL = __NN_GLOBAL__;</script>
         <script>
             // ===== NewsNow 独立视图 =====
             var NN_SELECTED = 'all';
@@ -502,9 +513,32 @@ _NEWSNOW_VIEW_TEMPLATE = """
             var NN_SRC_ORDER = [];
             var NN_SRC_ORDER_KEY = 'trendradar-nn-srcorder';
 
+            // ===== 管理员全局配置（后台可下发默认值并锁定）=====
+            var NN_GLOBAL = window.NN_GLOBAL || {};
+            NN_GLOBAL.defaults = (NN_GLOBAL.defaults && typeof NN_GLOBAL.defaults === 'object') ? NN_GLOBAL.defaults : {};
+            NN_GLOBAL.sourcesOrder = Array.isArray(NN_GLOBAL.sourcesOrder) ? NN_GLOBAL.sourcesOrder : [];
+            NN_GLOBAL.lock = (NN_GLOBAL.lock && typeof NN_GLOBAL.lock === 'object') ? NN_GLOBAL.lock : { mode: 'soft', keys: [] };
+            if (!Array.isArray(NN_GLOBAL.lock.keys)) NN_GLOBAL.lock.keys = [];
+            function nnIsLocked(key) {
+                if (!key) return false;
+                if (NN_GLOBAL.lock.mode === 'hard') return true;
+                return NN_GLOBAL.lock.keys.indexOf(key) >= 0;
+            }
+            function nnGlobalAvailable() {
+                return !!(NN_GLOBAL && (NN_GLOBAL.updated_at || NN_GLOBAL.sourcesOrder.length || NN_GLOBAL.lock.keys.length || NN_GLOBAL.lock.mode === 'hard'));
+            }
+
             function nnLoadOrder() {
                 try { NN_SRC_ORDER = JSON.parse(localStorage.getItem(NN_SRC_ORDER_KEY) || '[]') || []; } catch (e) { NN_SRC_ORDER = []; }
                 if (!Array.isArray(NN_SRC_ORDER)) NN_SRC_ORDER = [];
+                // 本地没有自定义顺序时，采用管理员下发的全局顺序
+                if (!NN_SRC_ORDER.length && NN_GLOBAL.sourcesOrder.length) {
+                    NN_SRC_ORDER = NN_GLOBAL.sourcesOrder.slice();
+                }
+                // 顺序被后台锁定时，始终以全局顺序为准
+                if (nnIsLocked('srcSort') && NN_GLOBAL.sourcesOrder.length) {
+                    NN_SRC_ORDER = NN_GLOBAL.sourcesOrder.slice();
+                }
             }
             function nnSaveOrder() {
                 try { localStorage.setItem(NN_SRC_ORDER_KEY, JSON.stringify(NN_SRC_ORDER)); } catch (e) {}
@@ -521,6 +555,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 });
             }
             function nnMoveSource(name, dir) {
+                if (nnIsLocked('srcSort')) return;  // 后台已锁定顺序
                 // 首次手动排序：以当前展示顺序为基准
                 if (!NN_SRC_ORDER.length) {
                     NN_SRC_ORDER = window.__nnLastOrder ? window.__nnLastOrder.slice() : [];
@@ -602,24 +637,58 @@ _NEWSNOW_VIEW_TEMPLATE = """
 
             // ---- 个性化设置 ----
             function nnLoadPrefs() {
+                // 1) 管理员全局默认值作为基线
+                var d = NN_GLOBAL.defaults || {};
+                Object.keys(NN_PREFS).forEach(function (k) {
+                    if (typeof d[k] === 'string') NN_PREFS[k] = d[k];
+                });
+                // 2) 访客本地设置覆盖（被锁定的项不覆盖）
                 try {
                     var raw = localStorage.getItem(NN_PREFS_KEY);
                     if (raw) {
                         var p = JSON.parse(raw);
                         if (p && typeof p === 'object') {
-                            if (['auto','light','dark'].indexOf(p.theme) >= 0) NN_PREFS.theme = p.theme;
-                            if (['compact','normal','loose'].indexOf(p.density) >= 0) NN_PREFS.density = p.density;
-                            if (['normal','large'].indexOf(p.font) >= 0) NN_PREFS.font = p.font;
-                            if (['white','tint','full'].indexOf(p.card) >= 0) NN_PREFS.card = p.card;
-                            if (['default','gradient','bing'].indexOf(p.bg) >= 0) NN_PREFS.bg = p.bg;
-                            if (['solid','high','mid','low'].indexOf(p.alpha) >= 0) NN_PREFS.alpha = p.alpha;
-                            if (['none','sm','md','lg'].indexOf(p.radius) >= 0) NN_PREFS.radius = p.radius;
-                            if (['count','name','custom'].indexOf(p.srcSort) >= 0) NN_PREFS.srcSort = p.srcSort;
-                            if (['off','5','10','20'].indexOf(p.hotwords) >= 0) NN_PREFS.hotwords = p.hotwords;
-                            if (['light','medium','deep'].indexOf(p.scrim) >= 0) NN_PREFS.scrim = p.scrim;
+                            if (!nnIsLocked('theme') && ['auto','light','dark'].indexOf(p.theme) >= 0) NN_PREFS.theme = p.theme;
+                            if (!nnIsLocked('density') && ['compact','normal','loose'].indexOf(p.density) >= 0) NN_PREFS.density = p.density;
+                            if (!nnIsLocked('font') && ['normal','large'].indexOf(p.font) >= 0) NN_PREFS.font = p.font;
+                            if (!nnIsLocked('card') && ['white','tint','full'].indexOf(p.card) >= 0) NN_PREFS.card = p.card;
+                            if (!nnIsLocked('bg') && ['default','gradient','bing'].indexOf(p.bg) >= 0) NN_PREFS.bg = p.bg;
+                            if (!nnIsLocked('alpha') && ['solid','high','mid','low'].indexOf(p.alpha) >= 0) NN_PREFS.alpha = p.alpha;
+                            if (!nnIsLocked('radius') && ['none','sm','md','lg'].indexOf(p.radius) >= 0) NN_PREFS.radius = p.radius;
+                            if (!nnIsLocked('srcSort') && ['count','name','custom'].indexOf(p.srcSort) >= 0) NN_PREFS.srcSort = p.srcSort;
+                            if (!nnIsLocked('hotwords') && ['off','5','10','20'].indexOf(p.hotwords) >= 0) NN_PREFS.hotwords = p.hotwords;
+                            if (!nnIsLocked('scrim') && ['light','medium','deep'].indexOf(p.scrim) >= 0) NN_PREFS.scrim = p.scrim;
                         }
                     }
                 } catch (e) {}
+                // 3) 锁定项最终以全局值为准
+                Object.keys(NN_PREFS).forEach(function (k) {
+                    if (nnIsLocked(k) && typeof d[k] === 'string') NN_PREFS[k] = d[k];
+                });
+            }
+            // 运行时拉取最新全局配置（后台改完，访客刷新即生效，无需重跑报告）
+            var NN_GLOBAL_TS = 0;
+            function nnRefreshGlobal() {
+                if (!window.fetch) return;
+                if (Date.now() - NN_GLOBAL_TS < 60000) return;
+                NN_GLOBAL_TS = Date.now();
+                fetch('api/newsnow/config', { cache: 'no-store' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (j) {
+                        if (!j || !j.ok || !j.config) return;
+                        var incoming = j.config;
+                        var changed = JSON.stringify(incoming.updated_at || '') !== JSON.stringify(NN_GLOBAL.updated_at || '');
+                        if (!changed) return;
+                        NN_GLOBAL.defaults = incoming.defaults || {};
+                        NN_GLOBAL.sourcesOrder = Array.isArray(incoming.sourcesOrder) ? incoming.sourcesOrder : [];
+                        NN_GLOBAL.lock = incoming.lock || { mode: 'soft', keys: [] };
+                        NN_GLOBAL.updated_at = incoming.updated_at || '';
+                        if (!NN_SRC_ORDER.length && NN_GLOBAL.sourcesOrder.length) NN_SRC_ORDER = NN_GLOBAL.sourcesOrder.slice();
+                        nnLoadPrefs();
+                        nnApplyPrefs();
+                        nnRender();
+                    })
+                    .catch(function () {});
             }
             function nnSavePrefs() {
                 try { localStorage.setItem(NN_PREFS_KEY, JSON.stringify(NN_PREFS)); } catch (e) {}
@@ -697,12 +766,34 @@ _NEWSNOW_VIEW_TEMPLATE = """
             function nnSyncSettingsUi() {
                 var panel = document.getElementById('nn-settings');
                 if (!panel) return;
+                var lockedLabels = [];
+                var labelMap = { theme: '主题', density: '密度', font: '字号', card: '卡片', bg: '背景', alpha: '透明度', radius: '圆角', srcSort: '来源排序', hotwords: '热词', scrim: '遮罩' };
                 panel.querySelectorAll('.nn-set-opts').forEach(function (group) {
                     var key = group.getAttribute('data-key');
                     group.querySelectorAll('.nn-set-opt').forEach(function (opt) {
                         opt.classList.toggle('active', opt.getAttribute('data-v') === String(NN_PREFS[key]));
                     });
+                    var locked = nnIsLocked(key);
+                    if (locked) lockedLabels.push(labelMap[key] || key);
+                    var row = group.closest ? group.closest('.nn-set-row') : null;
+                    if (row) row.classList.toggle('nn-locked', locked);
                 });
+                var note = document.getElementById('nn-set-note');
+                if (note) {
+                    if (nnGlobalAvailable()) {
+                        note.style.display = 'block';
+                        if (NN_GLOBAL.lock.mode === 'hard') {
+                            note.innerHTML = '样式由<b>后台统一配置</b>并已全量锁定，个人修改不会生效。';
+                        } else if (lockedLabels.length) {
+                            note.innerHTML = '以下项目由<b>后台锁定</b>：' + nnEsc(lockedLabels.join('、')) + '；其余可自行调整。';
+                        } else {
+                            note.innerHTML = '默认样式来自<b>后台全局配置</b>，仍可自行调整。';
+                        }
+                    } else {
+                        note.style.display = 'none';
+                        note.innerHTML = '';
+                    }
+                }
             }
             function nnToggleSettings(open) {
                 var panel = document.getElementById('nn-settings');
@@ -850,7 +941,9 @@ _NEWSNOW_VIEW_TEMPLATE = """
                     group.addEventListener('click', function (e) {
                         var opt = e.target.closest('.nn-set-opt');
                         if (!opt) return;
-                        NN_PREFS[group.getAttribute('data-key')] = opt.getAttribute('data-v');
+                        var key = group.getAttribute('data-key');
+                        if (nnIsLocked(key)) return;  // 后台已锁定该选项
+                        NN_PREFS[key] = opt.getAttribute('data-v');
                         nnSavePrefs();
                         nnApplyPrefs();
                     });
@@ -858,11 +951,13 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 var reset = document.getElementById('nn-reset');
                 if (reset) reset.addEventListener('click', function () {
                     NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default', alpha: 'solid', radius: 'none', srcSort: 'count', hotwords: 'off', scrim: 'medium' };
+                    nnLoadPrefs();  // 回到「全局默认 + 本地（未锁定项）」
                     nnSavePrefs();
                     nnApplyPrefs();
                 });
                 var orderReset = document.getElementById('nn-order-reset');
                 if (orderReset) orderReset.addEventListener('click', function () {
+                    if (nnIsLocked('srcSort')) return;
                     NN_SRC_ORDER = [];
                     try { localStorage.removeItem(NN_SRC_ORDER_KEY); } catch (e) {}
                     NN_PREFS.srcSort = 'count';
@@ -877,7 +972,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 try { localStorage.setItem('trendradar-newsnow', active ? '1' : '0'); } catch (e) {}
                 var btn = document.getElementById('newsnow-btn');
                 if (btn) btn.classList.toggle('active', active);
-                if (active) { nnApplyPrefs(); window.scrollTo(0, 0); }
+                if (active) { nnApplyPrefs(); nnRefreshGlobal(); window.scrollTo(0, 0); }
                 else { nnToggleSettings(false); nnApplySurface(); }
             }
 
@@ -1053,17 +1148,26 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 var moreList = document.getElementById('nn-more-list');
                 if (moreList) {
                     var mh = '';
+                    var orderLocked = nnIsLocked('srcSort');
+                    var orderResetBtn = document.getElementById('nn-order-reset');
                     var listOrder = nnApplyCustomOrder(cards);
                     listOrder.forEach(function (c, mi) {
                         mh += '<div class="nn-more-item" data-pick="' + nnEsc(c.name) + '">'
                             +  '<span class="nn-more-idx">' + (mi + 1) + '</span>'
                             +  '<span class="nn-dot" style="--c:' + nnColor(c.name) + '"></span>' + nnEsc(c.name)
                             +  '<span class="nn-count">' + c.items.length + ' 条</span>'
-                            +  '<button class="nn-card-btn nn-move" data-move="-1" data-name="' + nnEsc(c.name) + '" title="上移"' + (mi === 0 ? ' disabled' : '') + '>&#9650;</button>'
-                            +  '<button class="nn-card-btn nn-move" data-move="1" data-name="' + nnEsc(c.name) + '" title="下移"' + (mi === listOrder.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
+                            +  '<button class="nn-card-btn nn-move" data-move="-1" data-name="' + nnEsc(c.name) + '" title="上移"' + ((mi === 0 || orderLocked) ? ' disabled' : '') + '>&#9650;</button>'
+                            +  '<button class="nn-card-btn nn-move" data-move="1" data-name="' + nnEsc(c.name) + '" title="下移"' + ((mi === listOrder.length - 1 || orderLocked) ? ' disabled' : '') + '>&#9660;</button>'
                             +  '<button class="nn-card-btn' + (nnIsFav(c.name) ? ' faved' : '') + '" data-fav="' + nnEsc(c.name) + '" title="收藏该来源">' + (nnIsFav(c.name) ? '★' : '☆') + '</button>'
                             +  '</div>';
                     });
+                    var mhint = document.getElementById('nn-more-hint');
+                    if (mhint) {
+                        mhint.innerHTML = orderLocked
+                            ? '顺序由<b>后台统一设定</b>'
+                            : '用 <b>↑ ↓</b> 调整顺序';
+                    }
+                    if (orderResetBtn) orderResetBtn.style.display = orderLocked ? 'none' : '';
                     moreList.innerHTML = mh || '<div class="nn-empty">暂无来源</div>';
                     moreList.querySelectorAll('[data-fav]').forEach(function (b) {
                         b.addEventListener('click', function (e) {
@@ -4580,6 +4684,13 @@ __NEWSNOW_VIEW__
             }
         newsnow_json = json.dumps(newsnow_data, ensure_ascii=False).replace("</", "<\\/")
 
+        # 后台全局配置（默认值 / 全局来源顺序 / 锁定策略）
+        try:
+            from trendradar.report import newsnow_config as _nn_cfg
+            nn_global_json = json.dumps(_nn_cfg.public_view(), ensure_ascii=False).replace("</", "<\\/")
+        except Exception:
+            nn_global_json = "{}"
+
         button_html = (
             '<button id="newsnow-btn" class="toggle-wide-btn newsnow-toggle-btn" '
             'onclick="toggleNewsNowMode()" title="NewsNow 视图">N</button>'
@@ -4589,6 +4700,7 @@ __NEWSNOW_VIEW__
         html = html.replace("__NEWSNOW_VIEW__", _NEWSNOW_VIEW_TEMPLATE)
         html = html.replace("__NN_BING_URL__", _fetch_bing_wallpaper())
         html = html.replace("__NEWSNOW_DATA__", newsnow_json)
+        html = html.replace("__NN_GLOBAL__", nn_global_json)
 
     # 兜底：未启用（或占位符残留）时清空
     html = html.replace("__NEWSNOW_BUTTON__", "")
@@ -4596,5 +4708,6 @@ __NEWSNOW_VIEW__
     html = html.replace("__NEWSNOW_VIEW__", "")
     html = html.replace("__NN_BING_URL__", "")
     html = html.replace("__NEWSNOW_DATA__", "null")
+    html = html.replace("__NN_GLOBAL__", "{}")
 
     return html

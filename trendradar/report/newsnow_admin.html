@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NewsNow 后台管理 · TrendRadar</title>
+<style>
+    :root {
+        --bg: #0f1117;
+        --panel: #171a23;
+        --panel-2: #1d212c;
+        --line: #2a2f3d;
+        --text: #e6e9f2;
+        --sub: #9aa3b8;
+        --faint: #6b7488;
+        --accent: #6366f1;
+        --accent-2: #818cf8;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+        font-size: 14px; line-height: 1.55;
+    }
+    a { color: var(--accent-2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+        position: sticky; top: 0; z-index: 10;
+        display: flex; align-items: center; gap: 14px;
+        padding: 14px 22px;
+        background: rgba(15,17,23,0.88);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: .2px; }
+    .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #ec4899); }
+    .brand small { color: var(--faint); font-weight: 500; }
+    header .spacer { flex: 1; }
+    .pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 10px; border-radius: 999px; font-size: 12px;
+        border: 1px solid var(--line); color: var(--sub); background: var(--panel);
+    }
+    .pill.ok { color: #86efac; border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08); }
+    .pill.bad { color: #fca5a5; border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.08); }
+
+    main { max-width: 1080px; margin: 0 auto; padding: 22px 22px 90px; }
+
+    .card {
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 14px; padding: 18px 20px; margin-bottom: 18px;
+    }
+    .card h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: .2px; }
+    .card .desc { color: var(--faint); font-size: 12.5px; margin-bottom: 14px; }
+
+    .row {
+        display: grid; grid-template-columns: 118px 1fr 88px;
+        align-items: center; gap: 12px;
+        padding: 9px 0; border-top: 1px dashed rgba(255,255,255,.06);
+    }
+    .row:first-of-type { border-top: none; }
+    .row .label { color: var(--sub); font-size: 13px; }
+    .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .opt {
+        padding: 5px 11px; border-radius: 8px; cursor: pointer; font-size: 12.5px;
+        border: 1px solid var(--line); background: var(--panel-2); color: var(--sub);
+        transition: all .12s ease; user-select: none;
+    }
+    .opt:hover { color: var(--text); border-color: #3a4152; }
+    .opt.active { background: rgba(99,102,241,.16); border-color: rgba(99,102,241,.55); color: #c7d2fe; }
+    .row.locked .opts { opacity: .55; pointer-events: none; }
+    .lockcell { display: flex; justify-content: flex-end; }
+    .lockcell label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); cursor: pointer; }
+    .lockcell input { accent-color: var(--accent); }
+
+    .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+    .seg button {
+        border: none; background: var(--panel-2); color: var(--sub);
+        padding: 7px 14px; font-size: 12.5px; cursor: pointer;
+    }
+    .seg button.active { background: rgba(99,102,241,.2); color: #c7d2fe; }
+
+    .order-list { display: flex; flex-direction: column; gap: 4px; max-height: 420px; overflow: auto; padding-right: 4px; }
+    .order-item {
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 9px; border-radius: 8px; background: var(--panel-2);
+        border: 1px solid transparent;
+    }
+    .order-item:hover { border-color: var(--line); }
+    .order-item .idx { width: 22px; color: var(--faint); font-size: 11.5px; font-variant-numeric: tabular-nums; text-align: right; }
+    .order-item .name { flex: 1; font-size: 13px; }
+    .order-item .cnt { color: var(--faint); font-size: 11.5px; }
+    .mini {
+        border: 1px solid var(--line); background: var(--panel); color: var(--sub);
+        width: 24px; height: 24px; border-radius: 6px; cursor: pointer; font-size: 11px; line-height: 1;
+    }
+    .mini:hover { color: var(--text); border-color: #3a4152; }
+    .mini:disabled { opacity: .3; cursor: default; }
+
+    .btn {
+        border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+        padding: 8px 16px; border-radius: 9px; cursor: pointer; font-size: 13px;
+    }
+    .btn:hover { border-color: #3a4152; }
+    .btn.primary { background: linear-gradient(135deg, var(--accent), #7c3aed); border-color: transparent; font-weight: 600; }
+    .btn.primary:hover { filter: brightness(1.08); }
+    .btn.ghost { background: transparent; }
+    .btn:disabled { opacity: .5; cursor: default; }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .grow { flex: 1; }
+
+    input[type=password], input[type=text] {
+        background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+        padding: 9px 12px; border-radius: 9px; font-size: 13px; outline: none; min-width: 260px;
+        font-family: inherit;
+    }
+    input:focus { border-color: var(--accent); }
+
+    .savebar {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 22px;
+        background: rgba(15,17,23,.92); backdrop-filter: blur(12px);
+        border-top: 1px solid var(--line);
+    }
+    .savebar .state { font-size: 12.5px; color: var(--faint); }
+    .savebar .state.ok { color: #86efac; }
+    .savebar .state.err { color: #fca5a5; }
+    .savebar .spacer { flex: 1; }
+
+    .hint { font-size: 12px; color: var(--faint); line-height: 1.7; }
+    .hint code {
+        background: var(--panel-2); border: 1px solid var(--line);
+        padding: 1px 5px; border-radius: 5px; font-size: 11.5px; color: var(--sub);
+    }
+    .login-wrap { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    details summary { cursor: pointer; color: var(--sub); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header>
+    <div class="brand"><span class="dot"></span>NewsNow 后台管理 <small>TrendRadar · 全局控制</small></div>
+    <div class="spacer"></div>
+    <span class="pill" id="conn-pill">未登录</span>
+    <a class="pill" href="/" target="_blank">查看前台 ↗</a>
+</header>
+
+<main>
+    <div class="card">
+        <h2>管理员登录</h2>
+        <div class="desc">口令用于校验保存操作；只存在本浏览器 sessionStorage，不会写入页面。</div>
+        <div class="login-wrap">
+            <input type="password" id="token" placeholder="输入管理员口令（NN_ADMIN_TOKEN）" autocomplete="current-password">
+            <button class="btn" id="btn-login">验证并解锁</button>
+            <span class="hint" id="login-hint"></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>全局默认值</h2>
+        <div class="desc">所有访客进入 NewsNow 视图时的初始样式；右侧勾选「锁定」后，访客无法自行覆盖该项。</div>
+        <div id="prefs"></div>
+        <div class="row" style="grid-template-columns:118px 1fr;">
+            <span class="label">锁定模式</span>
+            <div class="seg" id="lock-mode">
+                <button data-v="soft" class="active">软锁定（仅勾选项）</button>
+                <button data-v="hard">全锁定（禁用设置面板）</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>来源顺序</h2>
+        <div class="desc">全局顺序作用于顶部来源按钮与卡片排布；访客本地没有自定义顺序时以此为准。</div>
+        <div class="toolbar" style="margin-bottom:10px">
+            <button class="btn ghost" id="btn-sync">从当前报告同步来源</button>
+            <button class="btn ghost" id="btn-clear">清空（按热度）</button>
+            <span class="hint" id="order-hint"></span>
+        </div>
+        <div class="order-list" id="order-list"></div>
+    </div>
+
+    <div class="card">
+        <h2>接口与文件</h2>
+        <div class="hint">
+            <div>读取：<code>GET /api/newsnow/config</code> · 保存：<code>POST /api/newsnow/config</code>（请求头 <code>X-NN-Token</code>）</div>
+            <div>配置落盘：<code id="cfg-path">state/newsnow.json</code>（容器内 <code>/app/state/newsnow.json</code>，已挂载到宿主，重建不丢）</div>
+            <div>未设置环境变量时，口令自动生成并保存在 <code>state/admin_token.txt</code>，可用 <code>docker exec trendradar cat /app/state/admin_token.txt</code> 查看。</div>
+        </div>
+        <details style="margin-top:10px">
+            <summary>手动编辑配置（JSON 直接粘贴）</summary>
+            <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px">
+                <textarea id="raw" spellcheck="false" style="width:100%;height:240px;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px"></textarea>
+                <div class="toolbar">
+                    <button class="btn ghost" id="btn-dump">载入当前配置</button>
+                    <button class="btn ghost" id="btn-apply-raw">应用这段 JSON</button>
+                </div>
+            </div>
+        </details>
+    </div>
+</main>
+
+<div class="savebar">
+    <span class="state" id="save-state">就绪</span>
+    <span class="savebar spacer"></span>
+    <button class="btn ghost" id="btn-reload">重新载入</button>
+    <button class="btn primary" id="btn-save">保存全局配置</button>
+</div>
+
+<script>
+(function () {
+    var KEYS = [
+        ['theme', '主题', [['auto', '跟随系统'], ['light', '浅色'], ['dark', '深色']]],
+        ['density', '卡片密度', [['normal', '标准'], ['compact', '紧凑'], ['loose', '宽松']]],
+        ['font', '标题字号', [['normal', '标准'], ['large', '大']]],
+        ['card', '卡片风格', [['tint', '彩色标题'], ['white', '纯白'], ['full', '整卡着色']]],
+        ['bg', '页面背景', [['default', '纯色'], ['gradient', '渐变'], ['bing', 'Bing 壁纸']]],
+        ['alpha', '界面透明度', [['solid', '实心'], ['high', '75%'], ['mid', '55%'], ['low', '35%']]],
+        ['radius', '顶栏圆角', [['none', '直角'], ['sm', '小'], ['md', '中'], ['lg', '大']]],
+        ['srcSort', '来源排序', [['count', '按热度'], ['name', '按名称'], ['custom', '自定义']]],
+        ['hotwords', '热词数量', [['off', '关'], ['5', 'Top5'], ['10', 'Top10'], ['20', 'Top20']]],
+        ['scrim', '壁纸遮罩', [['medium', '中'], ['light', '浅'], ['deep', '深']]]
+    ];
+    var TOKEN_KEY = 'trendradar-nn-admin-token';
+    var cfg = null;
+    var sources = [];
+    var order = [];
+
+    function $(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+    function token() { try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+    function setToken(v) { try { sessionStorage.setItem(TOKEN_KEY, v); } catch (e) {} }
+    function state(msg, cls) {
+        var el = $('save-state');
+        el.textContent = msg;
+        el.className = 'state' + (cls ? ' ' + cls : '');
+    }
+
+    // ---------- 渲染表单 ----------
+    function renderPrefs() {
+        var box = $('prefs');
+        var lockAll = cfg.lock.mode === 'hard';
+        var html = '';
+        KEYS.forEach(function (k) {
+            var key = k[0], label = k[1], opts = k[2];
+            var locked = lockAll || cfg.lock.keys.indexOf(key) >= 0;
+            html += '<div class="row' + (locked ? ' locked' : '') + '" data-key="' + key + '">'
+                + '<span class="label">' + label + '</span>'
+                + '<div class="opts">';
+            opts.forEach(function (o) {
+                var active = String(cfg.defaults[key]) === o[0];
+                html += '<span class="opt' + (active ? ' active' : '') + '" data-v="' + o[0] + '">' + o[1] + '</span>';
+            });
+            html += '</div><div class="lockcell"><label><input type="checkbox" class="lockbox" data-key="' + key + '"'
+                + ((lockAll || cfg.lock.keys.indexOf(key) >= 0) ? ' checked' : '') + (lockAll ? ' disabled' : '')
+                + '>锁定</label></div></div>';
+        });
+        box.innerHTML = html;
+
+        box.querySelectorAll('.row').forEach(function (row) {
+            var key = row.getAttribute('data-key');
+            row.querySelectorAll('.opt').forEach(function (o) {
+                o.addEventListener('click', function () {
+                    cfg.defaults[key] = o.getAttribute('data-v');
+                    row.querySelectorAll('.opt').forEach(function (x) { x.classList.remove('active'); });
+                    o.classList.add('active');
+                    state('有未保存的更改', '');
+                });
+            });
+        });
+        box.querySelectorAll('.lockbox').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                var key = cb.getAttribute('data-key');
+                var i = cfg.lock.keys.indexOf(key);
+                if (cb.checked && i < 0) cfg.lock.keys.push(key);
+                if (!cb.checked && i >= 0) cfg.lock.keys.splice(i, 1);
+                var row = cb.closest('.row');
+                if (row) row.classList.toggle('locked', cb.checked);
+                state('有未保存的更改', '');
+            });
+        });
+    }
+
+    function renderLockMode() {
+        var seg = $('lock-mode');
+        seg.querySelectorAll('button').forEach(function (b) {
+            b.classList.toggle('active', b.getAttribute('data-v') === cfg.lock.mode);
+            b.onclick = function () {
+                cfg.lock.mode = b.getAttribute('data-v');
+                renderLockMode();
+                renderPrefs();
+                state('有未保存的更改', '');
+            };
+        });
+    }
+
+    function renderOrder() {
+        var box = $('order-list');
+        if (!order.length) {
+            box.innerHTML = '<div class="hint" style="padding:8px 4px">暂无顺序设置：点「从当前报告同步来源」拉取，或直接留空使用按热度排序。</div>';
+            return;
+        }
+        var html = '';
+        order.forEach(function (name, i) {
+            var src = sources.filter(function (s) { return s.name === name; })[0];
+            html += '<div class="order-item" data-i="' + i + '">'
+                + '<span class="idx">' + (i + 1) + '</span>'
+                + '<span class="name">' + esc(name) + '</span>'
+                + (src ? '<span class="cnt">' + src.count + ' 条</span>' : '<span class="cnt">未在报告中</span>')
+                + '<button class="mini" data-move="-1"' + (i === 0 ? ' disabled' : '') + '>▲</button>'
+                + '<button class="mini" data-move="1"' + (i === order.length - 1 ? ' disabled' : '') + '>▼</button>'
+                + '<button class="mini" data-top="1"' + (i === 0 ? ' disabled' : '') + '>⇱</button>'
+                + '<button class="mini" data-del="1">✕</button>'
+                + '</div>';
+        });
+        box.innerHTML = html;
+        box.querySelectorAll('.order-item').forEach(function (row) {
+            var i = parseInt(row.getAttribute('data-i'), 10);
+            row.querySelectorAll('[data-move]').forEach(function (b) {
+                b.onclick = function () {
+                    var j = i + parseInt(b.getAttribute('data-move'), 10);
+                    if (j < 0 || j >= order.length) return;
+                    var t = order[i]; order[i] = order[j]; order[j] = t;
+                    renderOrder(); state('有未保存的更改', '');
+                };
+            });
+            var top = row.querySelector('[data-top]');
+            if (top) top.onclick = function () {
+                var v = order.splice(i, 1)[0];
+                order.unshift(v);
+                renderOrder(); state('有未保存的更改', '');
+            };
+            row.querySelector('[data-del]').onclick = function () {
+                order.splice(i, 1);
+                renderOrder(); state('有未保存的更改', '');
+            };
+        });
+        $('order-hint').textContent = order.length + ' 个来源已排序';
+    }
+
+    // ---------- 数据 ----------
+    function applyConfig(c) {
+        cfg = {
+            defaults: Object.assign({}, c.defaults || {}),
+            sourcesOrder: (c.sourcesOrder || []).slice(),
+            lock: { mode: (c.lock && c.lock.mode) || 'soft', keys: ((c.lock && c.lock.keys) || []).slice() }
+        };
+        order = cfg.sourcesOrder.slice();
+        renderPrefs();
+        renderLockMode();
+        renderOrder();
+        $('raw').value = JSON.stringify({ defaults: cfg.defaults, sourcesOrder: cfg.sourcesOrder, lock: cfg.lock }, null, 2);
+    }
+
+    function loadRemote() {
+        state('读取配置中…', '');
+        return fetch('/api/newsnow/config', { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j || !j.ok) throw new Error((j && j.error) || '读取失败');
+                applyConfig(j.config);
+                var t = j.config.updated_at || '尚未保存过';
+                state('已载入配置 · ' + t, 'ok');
+                if (!j.writesEnabled) {
+                    $('login-hint').textContent = '服务端当前不可写：请设置 NN_ADMIN_TOKEN 或允许写 state 目录';
+                }
+                return j;
+            })
+            .catch(function (e) {
+                state('读取失败：' + e.message, 'err');
+            });
+    }
+
+    function syncSources() {
+        $('order-hint').textContent = '正在读取当前报告…';
+        fetch('/index.html?ts=' + Date.now(), { cache: 'no-store' })
+            .then(function (r) { return r.text(); })
+            .then(function (txt) {
+                var m = txt.match(/window\.NEWSNOW_DATA\s*=\s*(\{[\s\S]*?\});\s*<\/script>/);
+                if (!m) throw new Error('页面里没有 NewsNow 数据（可能未启用或未生成报告）');
+                var data = JSON.parse(m[1]);
+                sources = (data.cards || []).map(function (c) {
+                    return { name: c.name, count: (c.items || []).length };
+                });
+                if (!sources.length) throw new Error('报告里没有来源数据');
+                sources.sort(function (a, b) { return b.count - a.count; });
+                // 保留已有顺序，追加新来源
+                var known = {};
+                order = order.filter(function (n) {
+                    var hit = sources.some(function (s) { return s.name === n; });
+                    if (hit) known[n] = 1;
+                    return hit;
+                });
+                sources.forEach(function (s) { if (!known[s.name]) order.push(s.name); });
+                renderOrder();
+                state('已同步 ' + sources.length + ' 个来源，记得保存', '');
+            })
+            .catch(function (e) {
+                $('order-hint').textContent = '同步失败：' + e.message;
+            });
+    }
+
+    function save() {
+        if (!token()) { state('请先输入管理员口令', 'err'); $('token').focus(); return; }
+        var payload = {
+            defaults: cfg.defaults,
+            sourcesOrder: order,
+            lock: { mode: cfg.lock.mode, keys: cfg.lock.mode === 'hard' ? [] : cfg.lock.keys }
+        };
+        var btn = $('btn-save');
+        btn.disabled = true;
+        state('保存中…', '');
+        fetch('/api/newsnow/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-NN-Token': token() },
+            body: JSON.stringify(payload)
+        }).then(function (r) {
+            return r.json().then(function (j) { return { status: r.status, body: j }; });
+        }).then(function (res) {
+            btn.disabled = false;
+            if (!res.body || !res.body.ok) {
+                state('保存失败：' + ((res.body && res.body.error) || ('HTTP ' + res.status)), 'err');
+                setConn(false);
+                return;
+            }
+            applyConfig(res.body.config);
+            setConn(true);
+            state('已保存 · ' + res.body.config.updated_at + ' · 访客刷新页面即生效', 'ok');
+        }).catch(function (e) {
+            btn.disabled = false;
+            state('保存失败：' + e.message, 'err');
+        });
+    }
+
+    function setConn(ok) {
+        var p = $('conn-pill');
+        p.className = 'pill ' + (ok ? 'ok' : 'bad');
+        p.textContent = ok ? '已解锁 · 可保存' : '未登录';
+    }
+
+    // ---------- 事件 ----------
+    $('btn-login').onclick = function () {
+        var v = $('token').value.trim();
+        if (!v) { $('login-hint').textContent = '口令不能为空'; return; }
+        state('验证口令…', '');
+        fetch('/api/newsnow/auth', { cache: 'no-store', headers: { 'X-NN-Token': v } })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j || !j.ok) throw new Error((j && j.error) || '验证失败');
+                if (!j.writesEnabled) throw new Error('服务端未配置 NN_ADMIN_TOKEN，暂不可写');
+                if (!j.valid) throw new Error('口令不正确');
+                setToken(v);
+                setConn(true);
+                $('login-hint').textContent = '口令有效';
+                state('已解锁，可以保存', 'ok');
+            })
+            .catch(function (e) {
+                setConn(false);
+                $('login-hint').textContent = e.message;
+                state('未解锁：' + e.message, 'err');
+            });
+    };
+    $('token').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') $('btn-login').click();
+    });
+    $('btn-save').onclick = save;
+    $('btn-reload').onclick = function () { loadRemote(); };
+    $('btn-sync').onclick = syncSources;
+    $('btn-clear').onclick = function () {
+        order = [];
+        renderOrder();
+        state('顺序已清空（保存后按热度排序）', '');
+    };
+    $('btn-dump').onclick = function () {
+        $('raw').value = JSON.stringify({ defaults: cfg.defaults, sourcesOrder: order, lock: cfg.lock }, null, 2);
+    };
+    $('btn-apply-raw').onclick = function () {
+        try {
+            var j = JSON.parse($('raw').value);
+            applyConfig(j);
+            order = (j.sourcesOrder || []).slice();
+            renderOrder();
+            state('JSON 已应用，记得保存', '');
+        } catch (e) {
+            state('JSON 解析失败：' + e.message, 'err');
+        }
+    };
+
+    if (token()) { $('token').value = token(); setConn(true); }
+    loadRemote();
+})();
+</script>
+</body>
+</html>

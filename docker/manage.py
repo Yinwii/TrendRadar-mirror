@@ -529,9 +529,9 @@ def _cleanup_stale_pid():
 
 
 def start_webserver():
-    """启动 Web 服务器托管 output 目录"""
+    """启动 Web 服务器托管 output 目录（内置 /admin 后台与配置 API）"""
     print(f"🌐 启动 Web 服务器 (端口: {WEBSERVER_PORT})...")
-    print(f"  🔒 安全提示：仅提供静态文件访问，限制在 {WEBSERVER_DIR} 目录")
+    print(f"  🔒 安全提示：静态文件限制在 {WEBSERVER_DIR} 目录；写接口需管理员口令")
 
     # 检查是否已经运行
     if Path(WEBSERVER_PID_FILE).exists():
@@ -562,11 +562,13 @@ def start_webserver():
 
     try:
         # 启动 HTTP 服务器
-        # 使用 --bind 绑定到 0.0.0.0 使容器内部可访问
-        # 工作目录限制在 WEBSERVER_DIR，防止访问其他目录
+        # 优先使用内置服务（静态文件 + /admin 后台 + NewsNow 配置 API）；
+        # 若模块缺失（旧镜像/裁剪环境）自动回退到标准库 http.server。
+        # --bind 绑定到 0.0.0.0 使容器内部可访问，工作目录限制在 WEBSERVER_DIR。
+        cmd = [sys.executable, '/app/trendradar/webserver.py', str(WEBSERVER_PORT), WEBSERVER_DIR]
         process = subprocess.Popen(
-            [sys.executable, '-m', 'http.server', str(WEBSERVER_PORT), '--bind', '0.0.0.0'],
-            cwd=WEBSERVER_DIR,
+            cmd,
+            cwd='/app',
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True
@@ -575,15 +577,28 @@ def start_webserver():
         # 等待一下确保服务器启动
         time.sleep(1)
 
+        # 内置服务起不来时回退为纯静态服务器
+        if process.poll() is not None:
+            print("  ⚠️ 内置服务启动失败，回退为静态文件服务器")
+            process = subprocess.Popen(
+                [sys.executable, '-m', 'http.server', str(WEBSERVER_PORT), '--bind', '0.0.0.0'],
+                cwd=WEBSERVER_DIR,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+            time.sleep(1)
+
         # 检查进程是否还在运行
         if process.poll() is None:
             # 保存 PID
             with open(WEBSERVER_PID_FILE, 'w') as f:
                 f.write(str(process.pid))
             print(f"  ✅ Web 服务器已启动 (PID: {process.pid})")
-            print(f"  📁 服务目录: {WEBSERVER_DIR} (只读，仅静态文件)")
+            print(f"  📁 服务目录: {WEBSERVER_DIR}")
             print(f"  🌐 访问地址: http://localhost:{WEBSERVER_PORT}")
             print(f"  📄 首页: http://localhost:{WEBSERVER_PORT}/index.html")
+            print(f"  🛠  后台管理: http://localhost:{WEBSERVER_PORT}/admin")
             print("  💡 停止服务: python manage.py stop_webserver")
         else:
             print(f"  ❌ Web 服务器启动失败")

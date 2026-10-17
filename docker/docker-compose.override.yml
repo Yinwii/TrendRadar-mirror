@@ -17,3 +17,9 @@ services:
       - ../trendradar/report/formatter.py:/app/trendradar/report/formatter.py:ro
       - ../trendradar/report/html.py:/app/trendradar/report/html.py:ro
       - ../trendradar/report/rss_html.py:/app/trendradar/report/rss_html.py:ro
+      # 可写状态目录：NewsNow 后台全局配置 + 管理员口令，重建容器不丢
+      - ../state:/app/state
+    environment:
+      # 管理员口令（不设置则自动生成并保存在 state/admin_token.txt）
+      - NN_ADMIN_TOKEN=${NN_ADMIN_TOKEN:-}
+      - NEWSNOW_STATE_DIR=/app/state
