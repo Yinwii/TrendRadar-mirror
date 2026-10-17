@@ -499,6 +499,59 @@ class NewsAnalyzer:
                 }
         return title_info
 
+    def _prepare_newsnow_data(
+        self,
+        data_source: Dict,
+        id_to_name: Dict,
+        title_info: Optional[Dict] = None,
+    ) -> Optional[Dict]:
+        """构建 NewsNow 视图的原始数据（不做关键词过滤，与 newsnow 官网一致）。
+
+        只保留「当前在榜」的条目：若已知最新批次时间，则过滤掉历史脱榜条目。
+        """
+        if not data_source:
+            return None
+
+        latest_time = None
+        if title_info:
+            for source_titles in title_info.values():
+                for title_data in source_titles.values():
+                    last_time = title_data.get("last_time", "")
+                    if last_time and (latest_time is None or last_time > latest_time):
+                        latest_time = last_time
+
+        sources = []
+        for platform_id, titles in data_source.items():
+            if not isinstance(titles, dict):
+                continue
+            items = []
+            for title, title_data in titles.items():
+                meta = {}
+                if title_info and platform_id in title_info:
+                    meta = title_info[platform_id].get(title, {}) or {}
+                if latest_time and meta and meta.get("last_time") != latest_time:
+                    continue
+                ranks = title_data.get("ranks") or []
+                rank = ranks[-1] if ranks else None
+                last_time = meta.get("last_time", "")
+                if len(last_time) == 5 and last_time[2:3] == "-":
+                    last_time = last_time.replace("-", ":")
+                items.append({
+                    "title": title,
+                    "url": title_data.get("mobileUrl") or title_data.get("url", ""),
+                    "rank": rank,
+                    "time": last_time,
+                    "new": bool(title_data.get("is_new") or meta.get("count", 0) == 1),
+                    "keyword": "",
+                })
+            items.sort(key=lambda x: x["rank"] if isinstance(x["rank"], int) else 9999)
+            if items:
+                sources.append({"name": id_to_name.get(platform_id, platform_id), "items": items[:40]})
+
+        if not sources:
+            return None
+        return {"sources": sources}
+
     def _prepare_standalone_data(
         self,
         results: Dict,
@@ -763,6 +816,7 @@ class NewsAnalyzer:
             display_regions = self.ctx.config.get("DISPLAY", {}).get("REGIONS", {})
             html_standalone = standalone_data if display_regions.get("STANDALONE", False) else None
             html_ai = ai_result if display_regions.get("AI_ANALYSIS", True) else None
+            newsnow_raw = self._prepare_newsnow_data(data_source, id_to_name, title_info)
             html_file = self.ctx.generate_html(
                 stats,
                 total_titles,
@@ -785,6 +839,7 @@ class NewsAnalyzer:
                     "rss_source_failed": self._rss_source_failed,
                 },
                 translate_report_func=translate_report_func,
+                newsnow_raw=newsnow_raw,
             )
 
         return stats, html_file, ai_result, rss_items, standalone_data, rss_new_items

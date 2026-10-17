@@ -870,6 +870,7 @@ def render_html_content(
     ai_analysis: Optional[Any] = None,
     show_new_section: bool = True,
     newsnow_enabled: bool = True,
+    newsnow_raw: Optional[Dict] = None,
 ) -> str:
     """渲染HTML内容
 
@@ -4252,25 +4253,39 @@ __NEWSNOW_VIEW__
 
     # ===== NewsNow 独立视图（参考 newsnow.busiyi.world，按开关注入）=====
     if newsnow_enabled:
-        # 按来源（平台）聚合所有命中新闻，供卡片流展示
-        newsnow_cards: Dict[str, List[Dict]] = {}
-        for stat in report_data.get("stats", []):
-            for t in stat.get("titles", []):
-                src = t.get("source_name") or "未知来源"
-                ranks = t.get("ranks") or []
-                newsnow_cards.setdefault(src, []).append({
-                    "title": t.get("title", ""),
-                    "url": t.get("mobile_url") or t.get("url", ""),
-                    "rank": min(ranks) if ranks else None,
-                    "time": t.get("time_display", ""),
-                    "new": bool(t.get("is_new", False)),
-                    "keyword": stat.get("word", ""),
-                })
-        newsnow_data = {
-            "generated_at": now.strftime("%m-%d %H:%M"),
-            "total": sum(len(v) for v in newsnow_cards.values()),
-            "cards": [{"name": k, "items": v} for k, v in newsnow_cards.items()],
-        }
+        if newsnow_raw and newsnow_raw.get("sources"):
+            # 优先使用未过滤的原始热榜数据（与 newsnow 官网一致：来源下有榜单即可展示，
+            # 不受关键词分组影响；关键词过滤只作用于报告正文与推送）
+            raw_cards = []
+            for src in newsnow_raw["sources"]:
+                items = src.get("items") or []
+                if items:
+                    raw_cards.append({"name": src.get("name") or "未知来源", "items": items})
+            newsnow_data = {
+                "generated_at": now.strftime("%m-%d %H:%M"),
+                "total": sum(len(c["items"]) for c in raw_cards),
+                "cards": raw_cards,
+            }
+        else:
+            # 兜底：按来源（平台）聚合所有命中新闻，供卡片流展示
+            newsnow_cards: Dict[str, List[Dict]] = {}
+            for stat in report_data.get("stats", []):
+                for t in stat.get("titles", []):
+                    src = t.get("source_name") or "未知来源"
+                    ranks = t.get("ranks") or []
+                    newsnow_cards.setdefault(src, []).append({
+                        "title": t.get("title", ""),
+                        "url": t.get("mobile_url") or t.get("url", ""),
+                        "rank": min(ranks) if ranks else None,
+                        "time": t.get("time_display", ""),
+                        "new": bool(t.get("is_new", False)),
+                        "keyword": stat.get("word", ""),
+                    })
+            newsnow_data = {
+                "generated_at": now.strftime("%m-%d %H:%M"),
+                "total": sum(len(v) for v in newsnow_cards.values()),
+                "cards": [{"name": k, "items": v} for k, v in newsnow_cards.items()],
+            }
         newsnow_json = json.dumps(newsnow_data, ensure_ascii=False).replace("</", "<\\/")
 
         button_html = (
