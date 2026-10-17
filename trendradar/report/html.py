@@ -30,6 +30,7 @@ _NEWSNOW_CSS = """
                 --nn-sub: #6b7280;
                 --nn-faint: #9aa3af;
                 --nn-hover: #f6f7f9;
+                --nn-item-hover: rgba(0,0,0,0.035);
                 --nn-chip-bg: #ffffff;
                 --nn-chip-border: #e3e6ec;
                 --nn-chip-text: #4b5563;
@@ -55,6 +56,7 @@ _NEWSNOW_CSS = """
                 --nn-sub: #9aa3b5;
                 --nn-faint: #6b7488;
                 --nn-hover: #232939;
+                --nn-item-hover: rgba(255,255,255,0.06);
                 --nn-chip-bg: #1b1f2a;
                 --nn-chip-border: #2b3242;
                 --nn-chip-text: #9aa3b5;
@@ -185,7 +187,7 @@ _NEWSNOW_CSS = """
                 display: flex; gap: 9px; padding: 10px 16px;
                 align-items: flex-start; transition: background 0.12s ease;
             }
-            .nn-item:hover { background: var(--nn-hover); }
+            .nn-item:hover { background: var(--nn-item-hover); }
             .nn-rank {
                 flex: 0 0 22px; height: 22px; margin-top: 1px; border-radius: 6px;
                 font-size: 12px; font-weight: 700;
@@ -309,6 +311,22 @@ _NEWSNOW_VIEW_TEMPLATE = """
                                 <span class="nn-set-opt" data-v="large">大号</span>
                             </div>
                         </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">卡片配色</span>
+                            <div class="nn-set-opts" data-key="card">
+                                <span class="nn-set-opt" data-v="white">纯白</span>
+                                <span class="nn-set-opt" data-v="tint">彩色标题</span>
+                                <span class="nn-set-opt" data-v="full">彩色卡片</span>
+                            </div>
+                        </div>
+                        <div class="nn-set-row">
+                            <span class="nn-set-label">页面背景</span>
+                            <div class="nn-set-opts" data-key="bg">
+                                <span class="nn-set-opt" data-v="default">默认</span>
+                                <span class="nn-set-opt" data-v="gradient">渐变</span>
+                                <span class="nn-set-opt" data-v="bing">Bing 每日图</span>
+                            </div>
+                        </div>
                         <button class="nn-set-reset" id="nn-reset">恢复默认</button>
                     </div>
                     <div class="nn-more-panel" id="nn-more-panel">
@@ -326,12 +344,13 @@ _NEWSNOW_VIEW_TEMPLATE = """
             </div>
         </div>
         <script>window.NEWSNOW_DATA = __NEWSNOW_DATA__;</script>
+        <script>window.NN_BING_URL = "__NN_BING_URL__";</script>
         <script>
             // ===== NewsNow 独立视图 =====
             var NN_SELECTED = 'all';
             var NN_COLORS = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#84cc16','#10b981','#0ea5e9','#a855f7'];
             var NN_PREFS_KEY = 'trendradar-nn-prefs';
-            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal' };
+            var NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default' };
             var NN_TAB = 'hot';
             var NN_FAVS = [];
             var NN_CHIPS_EXPANDED = false;
@@ -348,10 +367,11 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 nnSaveFavs();
                 nnRender();
             }
-            function nnTint(name) {
+            function nnTint(name, alpha) {
                 var hex = nnColor(name);
+                var a = (alpha == null) ? 0.16 : alpha;
                 var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-                return 'rgba(' + r + ',' + g + ',' + b + ',0.16)';
+                return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
             }
             function nnTimeMinutes(t) {
                 var m = /(\\d{1,2}):(\\d{2})/.exec(String(t || ''));
@@ -388,6 +408,8 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             if (['auto','light','dark'].indexOf(p.theme) >= 0) NN_PREFS.theme = p.theme;
                             if (['compact','normal','loose'].indexOf(p.density) >= 0) NN_PREFS.density = p.density;
                             if (['normal','large'].indexOf(p.font) >= 0) NN_PREFS.font = p.font;
+                            if (['white','tint','full'].indexOf(p.card) >= 0) NN_PREFS.card = p.card;
+                            if (['default','gradient','bing'].indexOf(p.bg) >= 0) NN_PREFS.bg = p.bg;
                         }
                     }
                 } catch (e) {}
@@ -405,13 +427,42 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 v.style.setProperty('--nn-colw', colw);
                 var fs = ({ normal: '14px', large: '15.5px' })[NN_PREFS.font] || '14px';
                 v.style.setProperty('--nn-title-size', fs);
-                nnSyncBodyBg();
+                nnApplySurface();
                 nnSyncSettingsUi();
             }
-            function nnSyncBodyBg() {
+            function nnApplySurface() {
                 var v = document.getElementById('newsnow-view');
-                if (!document.body.classList.contains('newsnow-mode') || !v) { document.body.style.background = ''; return; }
-                document.body.style.background = getComputedStyle(v).backgroundColor;
+                if (!v) return;
+                var bs = document.body.style;
+                bs.backgroundImage = '';
+                bs.backgroundSize = '';
+                bs.backgroundPosition = '';
+                bs.backgroundAttachment = '';
+                bs.backgroundRepeat = '';
+                bs.backgroundColor = '';
+                v.style.background = '';
+                if (!document.body.classList.contains('newsnow-mode')) return;
+
+                var dark = v.classList.contains('force-dark') ||
+                    (document.body.classList.contains('dark-mode') && !v.classList.contains('force-light'));
+                var mode = NN_PREFS.bg || 'default';
+                var bing = window.NN_BING_URL || '';
+
+                if (mode === 'bing' && bing) {
+                    var scrim = dark ? 'rgba(10,12,18,0.74)' : 'rgba(244,245,247,0.85)';
+                    bs.backgroundImage = 'linear-gradient(' + scrim + ',' + scrim + '), url("' + bing + '")';
+                    bs.backgroundSize = 'cover';
+                    bs.backgroundPosition = 'center center';
+                    bs.backgroundAttachment = 'fixed';
+                    bs.backgroundRepeat = 'no-repeat';
+                    v.style.background = 'transparent';
+                } else if (mode === 'gradient') {
+                    bs.backgroundImage = dark
+                        ? 'linear-gradient(160deg,#10131a 0%,#161b26 50%,#1b1522 100%)'
+                        : 'linear-gradient(160deg,#eef2f8 0%,#e7eef7 45%,#f4eef8 100%)';
+                    bs.backgroundAttachment = 'fixed';
+                    v.style.background = 'transparent';
+                }
             }
             function nnSyncSettingsUi() {
                 var panel = document.getElementById('nn-settings');
@@ -515,7 +566,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 });
                 var reset = document.getElementById('nn-reset');
                 if (reset) reset.addEventListener('click', function () {
-                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal' };
+                    NN_PREFS = { theme: 'auto', density: 'normal', font: 'normal', card: 'tint', bg: 'default' };
                     nnSavePrefs();
                     nnApplyPrefs();
                 });
@@ -528,7 +579,7 @@ _NEWSNOW_VIEW_TEMPLATE = """
                 var btn = document.getElementById('newsnow-btn');
                 if (btn) btn.classList.toggle('active', active);
                 if (active) { nnApplyPrefs(); nnRender(); window.scrollTo(0, 0); }
-                else { nnToggleSettings(false); nnSyncBodyBg(); }
+                else { nnToggleSettings(false); nnApplySurface(); }
             }
 
             function nnRender() {
@@ -600,8 +651,12 @@ _NEWSNOW_VIEW_TEMPLATE = """
                             });
                         }
                         var faved = nnIsFav(card.name);
-                        out += '<div class="nn-card">'
-                            +  '<div class="nn-card-head nn-tinted" style="background:' + nnTint(card.name) + '"><span class="nn-dot" style="--c:' + nnColor(card.name) + '"></span>'
+                        var headStyle = (NN_PREFS.card === 'white') ? '' : ' style="background:' + nnTint(card.name) + '"';
+                        var cardStyle = (NN_PREFS.card === 'full')
+                            ? ' style="background:' + nnTint(card.name, 0.07) + ';border-color:' + nnTint(card.name, 0.3) + '"'
+                            : '';
+                        out += '<div class="nn-card"' + cardStyle + '>'
+                            +  '<div class="nn-card-head nn-tinted"' + headStyle + '><span class="nn-dot" style="--c:' + nnColor(card.name) + '"></span>'
                             +  nnEsc(card.name)
                             +  '<span class="nn-card-count">' + items.length + ' 条</span>'
                             +  '<button class="nn-card-btn' + (faved ? ' faved' : '') + '" data-fav="' + nnEsc(card.name) + '" title="收藏该来源">' + (faved ? '★' : '☆') + '</button>'
@@ -697,6 +752,29 @@ _NEWSNOW_VIEW_TEMPLATE = """
             })();
         </script>
 """
+
+
+def _fetch_bing_wallpaper() -> str:
+    """获取 Bing 每日壁纸直链（服务端抓取，规避浏览器 CORS）；失败返回空串。"""
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(
+            "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN",
+            headers={"User-Agent": "Mozilla/5.0 (compatible; TrendRadar/1.0)"},
+        )
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8", "ignore"))
+        img = (data.get("images") or [{}])[0]
+        urlbase = img.get("urlbase") or ""
+        if urlbase:
+            return "https://www.bing.com" + urlbase + "_1920x1080.jpg"
+        url = img.get("url") or ""
+        if url:
+            return "https://www.bing.com" + url
+    except Exception:
+        pass
+    return ""
 
 
 def render_html_content(
@@ -4124,12 +4202,14 @@ __NEWSNOW_VIEW__
         html = html.replace("__NEWSNOW_BUTTON__", button_html)
         html = html.replace("__NEWSNOW_CSS__", _NEWSNOW_CSS)
         html = html.replace("__NEWSNOW_VIEW__", _NEWSNOW_VIEW_TEMPLATE)
+        html = html.replace("__NN_BING_URL__", _fetch_bing_wallpaper())
         html = html.replace("__NEWSNOW_DATA__", newsnow_json)
 
     # 兜底：未启用（或占位符残留）时清空
     html = html.replace("__NEWSNOW_BUTTON__", "")
     html = html.replace("__NEWSNOW_CSS__", "")
     html = html.replace("__NEWSNOW_VIEW__", "")
+    html = html.replace("__NN_BING_URL__", "")
     html = html.replace("__NEWSNOW_DATA__", "null")
 
     return html
