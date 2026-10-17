@@ -1,7 +1,7 @@
 # ============================================================
 # 本地定制层（fork 专用）—— 由 Yinwii 维护，不属于上游仓库
 # ------------------------------------------------------------
-# 作用：把仓库源码中的 4 个定制文件以只读方式挂进 trendradar 容器。
+# 作用：把仓库源码中的定制文件以只读方式挂进 trendradar 容器。
 # 为什么：镜像里的 /app 代码是构建时的快照，容器一旦被
 #         `docker compose up -d` / `pull` 重建，此前用 docker cp
 #         塞进去的定制改动就会丢失。挂载后「单一真源 = 仓库源码」，
@@ -17,6 +17,10 @@ services:
       - ../trendradar/report/formatter.py:/app/trendradar/report/formatter.py:ro
       - ../trendradar/report/html.py:/app/trendradar/report/html.py:ro
       - ../trendradar/report/rss_html.py:/app/trendradar/report/rss_html.py:ro
+      # NewsNow 后台：配置模块 / 管理页 / Web 服务（改完不必重建镜像，重启容器即生效）
+      - ../trendradar/report/newsnow_config.py:/app/trendradar/report/newsnow_config.py:ro
+      - ../trendradar/report/newsnow_admin.html:/app/trendradar/report/newsnow_admin.html:ro
+      - ../trendradar/webserver.py:/app/trendradar/webserver.py:ro
       # 可写状态目录：NewsNow 后台全局配置 + 管理员口令，重建容器不丢
       - ../state:/app/state
     environment:
