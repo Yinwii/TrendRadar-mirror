@@ -647,8 +647,26 @@
             });
     }
 
-    // 只读取报告里的来源清单（用于「来源启用」与条数展示），不改动顺序
+    // 读取来源清单：优先走服务端轻量接口（~1KB），失败再退回解析整页
     function loadSourceNames() {
+        return fetch('/api/newsnow/sources', { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (j && j.ok && j.sources && j.sources.length) {
+                    sources = j.sources;
+                    sources.sort(function (a, b) { return b.count - a.count; });
+                    renderSources();
+                    return sources;
+                }
+                throw new Error((j && j.error) || '来源接口为空');
+            })
+            .catch(function (e) {
+                if (e && e.message && e.message.indexOf('Failed to fetch') < 0 && e.message.indexOf('报告') >= 0) throw e;
+                return loadSourceNamesLegacy();
+            });
+    }
+
+    function loadSourceNamesLegacy() {
         return fetch('/index.html?ts=' + Date.now(), { cache: 'no-store' })
             .then(function (r) { return r.text(); })
             .then(function (txt) {

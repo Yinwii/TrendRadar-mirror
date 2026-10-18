@@ -53,6 +53,13 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---------------- 工具 ----------------
 
+    def end_headers(self):
+        # 个人站点流量低：一律短连接，杜绝 keep-alive 半开连接导致的
+        # 「Unexpected end of JSON input」「Failed to fetch」等截断类故障
+        self.close_connection = True
+        self.send_header("Connection", "close")
+        super().end_headers()
+
     def _send_json(self, payload, status=HTTPStatus.OK):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
@@ -110,6 +117,8 @@ class Handler(SimpleHTTPRequestHandler):
                 "valid": newsnow_config.check_token(self._token()),
                 "writesEnabled": newsnow_config.writes_enabled(),
             })
+        if path == "/api/newsnow/sources":
+            return self._send_json(self._collect_sources())
         if path == "/admin":
             return self._send_admin()
         if path == "/favicon.ico":
@@ -163,6 +172,29 @@ class Handler(SimpleHTTPRequestHandler):
         return self._send_json({"ok": True, "config": cfg})
 
     # ---------------- 管理页 ----------------
+
+    def _collect_sources(self):
+        """服务端解析报告页内嵌的 NEWSNOW_DATA，返回轻量来源清单（含条数）。
+
+        避免后台页整页下载 694KB 的 index.html 再做正则——移动端/弱网下极易中断。
+        """
+        import re
+        try:
+            root = Path(getattr(self, "directory", "."))
+            txt = (root / "index.html").read_text(encoding="utf-8", errors="replace")
+            m = re.search(r"window\.NEWSNOW_DATA\s*=\s*(\{.*?\});\s*</script>", txt, re.S)
+            if not m:
+                return {"ok": False, "error": "报告页里没有 NEWSNOW_DATA（可能未生成 NewsNow 报告）", "sources": []}
+            data = json.loads(m.group(1))
+            sources = [
+                {"name": c.get("name", ""), "count": len(c.get("items", []))}
+                for c in data.get("cards", [])
+                if c.get("name")
+            ]
+            sources.sort(key=lambda s: -s["count"])
+            return {"ok": True, "sources": sources, "updated": data.get("updated_at", "")}
+        except Exception as e:
+            return {"ok": False, "error": f"解析报告失败: {e}", "sources": []}
 
     def _send_file(self, file_path: Path, content_type: str, cache: bool = False):
         try:
