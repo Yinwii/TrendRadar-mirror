@@ -476,7 +476,7 @@
                 + '<span class="handle" title="拖动调整顺序">⋮⋮</span>'
                 + '<span class="idx">' + (i + 1) + '</span>'
                 + '<span class="name" title="' + esc(name) + (off ? ' · 已停用' : '') + '">' + esc(name) + (off ? ' · 已停用' : '') + '</span>'
-                + (src ? '<span class="cnt">' + src.count + ' 条</span>' : '<span class="cnt">未在报告中</span>')
+                + (sources.length ? (src ? '<span class="cnt">' + src.count + ' 条</span>' : '<span class="cnt">未在报告中</span>') : '<span class="cnt"></span>')
                 + '<span class="order-actions">'
                 + '<button class="mini" data-top="1" title="置顶"' + (i === 0 ? ' disabled' : '') + '>⇱</button>'
                 + '<button class="mini" data-move="-1" title="上移"' + (i === 0 ? ' disabled' : '') + '>▲</button>'
@@ -630,7 +630,7 @@
             .then(function (j) {
                 if (!j || !j.ok) throw new Error((j && j.error) || '读取失败');
                 applyConfig(j.config);
-                if (!sources.length) { loadSourceNames().catch(function () {}); }
+                if (!sources.length) { loadSourceNames().catch(function () {}); setTimeout(function () { if (sources.length) renderOrder(); }, 1500); }
                 var t = j.config.updated_at || '尚未保存过';
                 state('已载入配置 · ' + t, 'ok');
                 if (!j.writesEnabled) {
@@ -656,6 +656,7 @@
                     sources = j.sources;
                     sources.sort(function (a, b) { return b.count - a.count; });
                     renderSources();
+                    renderOrder();
                     return sources;
                 }
                 throw new Error((j && j.error) || '来源接口为空');
@@ -679,6 +680,7 @@
                 if (!sources.length) throw new Error('报告里没有来源数据');
                 sources.sort(function (a, b) { return b.count - a.count; });
                 renderSources();
+                renderOrder();
                 return sources;
             });
     }
