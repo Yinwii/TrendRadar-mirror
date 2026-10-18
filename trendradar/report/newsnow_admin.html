@@ -160,6 +160,32 @@
     .order-item.off .name { text-decoration: line-through; color: var(--faint); }
 
     .src-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; max-height: 360px; overflow: auto; padding-right: 4px; }
+    /* 展开/收起：卡片放大为近全屏浮层，方便拖拽与勾选 */
+    #expand-backdrop {
+        display: none; position: fixed; inset: 0; z-index: 55;
+        background: rgba(10, 14, 28, .45); backdrop-filter: blur(2px);
+    }
+    body.expanding #expand-backdrop { display: block; }
+    .card.expanded {
+        position: fixed; inset: 4vh 4vw; z-index: 60; margin: 0;
+        max-width: none; max-height: 92vh; overflow: auto;
+        box-shadow: 0 18px 60px rgba(10, 16, 40, .35);
+    }
+    body.expanding .savebar { z-index: 70; }
+    body.expanding .card.expanded { bottom: calc(4vh + 58px); max-height: calc(92vh - 58px); }
+    .card.expanded .order-list,
+    .card.expanded .src-grid {
+        max-height: calc(92vh - 190px);
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+    .card.expanded .order-item,
+    .card.expanded .src-cell { padding: 10px 14px; font-size: 14px; }
+    .card.expanded > .expand-close { display: inline-flex; }
+    .expand-close {
+        display: none; position: absolute; top: 14px; right: 14px; z-index: 5;
+        align-items: center; gap: 6px;
+    }
+    .card { position: relative; }
     .src-cell {
         display: flex; align-items: center; gap: 8px; padding: 7px 10px;
         background: var(--panel-2); border: 1px solid transparent; border-radius: 8px;
@@ -265,8 +291,9 @@
         </div>
     </div>
 
-    <div class="card admin-only">
+    <div class="card admin-only" id="order-card">
         <h2>来源顺序</h2>
+        <button class="btn ghost expand-close" data-close="1">✕ 收起（Esc）</button>
         <div class="desc">
             一份顺序同时驱动<b>顶部来源按钮</b>与<b>卡片模块</b>的排列，两者始终一致。
             直接拖动行即可排序，也可用行尾按钮 ⇱ 置顶 / ▲ 上移 / ▼ 下移 / ⇲ 置底。<br>
@@ -275,13 +302,15 @@
         <div class="toolbar" style="margin-bottom:10px">
             <button class="btn ghost" id="btn-sync">从当前报告同步来源</button>
             <button class="btn ghost" id="btn-clear">清空（按热度）</button>
+            <button class="btn ghost" data-expand="order-card">⤢ 展开调整</button>
             <span class="hint" id="order-hint"></span>
         </div>
         <div class="order-list" id="order-list"></div>
     </div>
 
-    <div class="card admin-only">
+    <div class="card admin-only" id="src-card">
         <h2>来源启用</h2>
+        <button class="btn ghost expand-close" data-close="1">✕ 收起（Esc）</button>
         <div class="desc">
             取消勾选的来源会从页面彻底隐藏——顶部来源按钮、卡片模块、来源目录都不再出现。
             顺序里被停用的来源会保留位置，重新启用后回到原位。
@@ -289,6 +318,7 @@
         <div class="toolbar" style="margin-bottom:10px">
             <button class="btn ghost" id="btn-all-on">全部启用</button>
             <button class="btn ghost" id="btn-all-off">全部停用</button>
+            <button class="btn ghost" data-expand="src-card">⤢ 展开调整</button>
             <span class="hint" id="src-hint"></span>
         </div>
         <div class="src-grid" id="src-grid"></div>
@@ -313,6 +343,8 @@
         </details>
     </div>
 </main>
+
+<div id="expand-backdrop"></div>
 
 <div class="savebar admin-only">
     <span class="state" id="save-state">就绪</span>
@@ -825,6 +857,37 @@
         renderOrder();
         state('已全部停用（记得保存）', '');
     };
+
+    // ---------- 展开/收起（顺序卡、启用卡） ----------
+    var expandedCard = null;
+    function refreshExpandBtns() {
+        document.querySelectorAll('[data-expand]').forEach(function (b) {
+            var card = document.getElementById(b.getAttribute('data-expand'));
+            b.textContent = (card && expandedCard === card) ? '⤡ 收起' : '⤢ 展开调整';
+        });
+    }
+    function setExpand(card) {
+        if (expandedCard) expandedCard.classList.remove('expanded');
+        expandedCard = card || null;
+        if (expandedCard) expandedCard.classList.add('expanded');
+        document.body.classList.toggle('expanding', !!expandedCard);
+        refreshExpandBtns();
+        if (expandedCard) expandedCard.scrollIntoView({ block: 'start' });
+    }
+    document.querySelectorAll('[data-expand]').forEach(function (b) {
+        b.onclick = function () {
+            var card = document.getElementById(b.getAttribute('data-expand'));
+            if (!card) return;
+            setExpand(expandedCard === card ? null : card);
+        };
+    });
+    document.querySelectorAll('.expand-close').forEach(function (b) {
+        b.onclick = function () { setExpand(null); };
+    });
+    $('expand-backdrop').onclick = function () { setExpand(null); };
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && expandedCard) setExpand(null);
+    });
 
     function unlock() {
         document.body.classList.remove('locked');
